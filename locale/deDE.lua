@@ -1,0 +1,4 @@
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RareTimer", "deDE",false)
+if not L then return end
+
+L["Scorchwing"] = "Scorchwing"

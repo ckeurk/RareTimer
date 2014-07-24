@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Addon Author="Kowh" APIVersion="9" Name="RareTimer" Description="Track last spawn time for world bosses.">
+	<Script Name="libs/GeminiAddon/GeminiAddon.lua"/>
+	<Script Name="libs/GeminiLocale/GeminiLocale.lua"/>
+	<Script Name="libs/GeminiHook/GeminiHook-1.0.lua"/>
+	<Script Name="libs/GeminiDB/GeminiDB-1.0.lua"/>
+
+	<Script Name="locale/enUS.lua"/>
+	<Script Name="locale/deDE.lua"/>
+	<Script Name="locale/frFR.lua"/>
+
+	<Script Name="RareTimer.lua"/>
+	<Form Name="RareTimer.xml"/>
+</Addon>
