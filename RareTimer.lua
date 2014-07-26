@@ -14,11 +14,7 @@ local RareTimer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("RareT
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("RareTimer", true) -- Silent = true
 local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
 
-local defaults = {
-    profile = {
-	config = {}
-    }
-}
+
  
 -----------------------------------------------------------------------------------------------
 -- Constants
@@ -29,25 +25,60 @@ local Source = {
     Target = 0,
     Kill = 1,
     Create = 2,
-    Destroy = 3
+    Destroy = 3,
+    Combat = 4,
+    Report = 5,
+    Timer = 6,
 }
 
-local DefaultRares = {
-    { 	Name = "Scorchwing",
-    	MinEst = "60m",
-	MaxEst = "110m",
-    },
-    { 	Name = "Honeysting Barbtail", 
-    	MinEst = "2m",
-	MaxEst = "10m",
-    }
+local States = {
+    Unknown = 0, -- Unseen, unreported
+    Killed = 1, -- Player saw kill
+    Dead = 2, -- Player saw corpse, but not the kill
+    Pending = 3, -- Should spawn anytime now
+    Alive = 4, -- Up and at full health
+    InCombat = 5, -- In combat (not at 100%)
+    Expired = 6, -- Been longer than MaxSpawn since last known kill
 }
 
 -----------------------------------------------------------------------------------------------
 -- RareTimer OnInitialize
 -----------------------------------------------------------------------------------------------
 function RareTimer:OnInitialize()
+    local defaults = {
+        profile = {
+            config = {
+                SpamParty = false,
+                SpamGuild = false,
+                SpamZone = false,
+                Slack = 600, --10m, EstMax + Slack = Expired
+            },
+            mobs = {
+                ['**'] = {
+                    --Name
+                    State = States.Unknown,
+                    --Killed
+                    --Timestamp
+                    --MinSpawn
+                    --MaxSpawn
+                    --Due
+                    --Expires
+                },
+                {    
+                    Name = L["Scorchwing"],
+                    MinSpawn = 3600, --60m
+                    MaxSpawn = 6600, --110m
+                },
+                {    
+                    Name = L["Honeysting Barbtail"], 
+                    MinSpawn = 120, --2m
+                    MaxSpawn = 600, --10m
+                }
+            }
+        }
+    }
     self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
+
     -- load our form file
     self.xmlDoc = XmlDoc.CreateFromFile("RareTimer.xml")
 end
@@ -57,45 +88,21 @@ end
 -----------------------------------------------------------------------------------------------
 function RareTimer:OnEnable()
     if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
-	-- Init
+        -- Init
+        -- Slash commands
+        Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
 
-	-- Slash commands
-	Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
+        -- Event handlers
+        Apollo.RegisterEventHandler("CombatLogDamage", "OnCombatLogDamage", self)
+        Apollo.RegisterEventHandler("TargetUnitChanged", "OnTargetUnitChanged", self)
+        Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
+        Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
 
-	-- Event handlers
-	Apollo.RegisterEventHandler("CombatLogDamage", "OnCombatLogDamage", self)
-	Apollo.RegisterEventHandler("TargetUnitChanged", "OnTargetUnitChanged", self)
-	Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
-	Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
+        -- Status update channel
+        self.chanICC = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
 
-	-- Status update channel
-	self.chanICC = ICCommLib.JoinChannel("RareTimerChannel", "OnDotMessageRareTimerChannelMessage", self)
-
-	-- Timers
-	--self.timer = ApolloTimer.Create(5.0, true, "AnnounceTimer", self) -- In seconds
-    end
-end
-
------------------------------------------------------------------------------------------------
--- Saved Information
------------------------------------------------------------------------------------------------
-
--- Save
-function RareTimer:OnSave(eLevel)
-    if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then
-        return nil
-    end
-
-    local save = {}
-    save.Rares = Rares
-
-    return save
-end
-
--- Restore
-function RareTimer:OnRestore(eLevel, tData)
-    if eLevel == GameLib.CodeEnumAddonSaveLevel.Character then
-        if tData.Rares  ~= nil then Rares = tData.Rares end
+        -- Timers
+        --self.timer = ApolloTimer.Create(5.0, true, "onTimer", self) -- In seconds
     end
 end
 
@@ -104,9 +111,30 @@ end
 -----------------------------------------------------------------------------------------------
 
 -- on SlashCommand "/raretimer"
-function RareTimer:OnRareTimerOn()
-	Print("RareTimer!")
-	--self.wndMain:Show(true) -- show the window (Need to init before we can use)
+function RareTimer:OnRareTimerOn(sCmd, sInput)
+    local s = string.lower(sInput)
+    if s ~= nil and s ~= '' and s ~= 'help' then
+        if s == "list" then
+            self:ShowList()
+        elseif s == "spam" then
+        elseif s == "debug" then
+            self:PrintTable(self.db.profile.mobs)
+        end
+    else
+        self:ShowHelp()
+    end
+    --Print(inspect(self.db))
+    --for a,b in pairs(L) do
+        --Print("A: " .. a .. " B: " .. b)
+    --end
+    --Print("RareTimer!")
+    --self.wndMain:Show(true) -- show the window (Need to init before we can use)
+end
+function RareTimer:ShowHelp()
+    self:CPrint("RareTimer commands:")
+    self:CPrint("help <command>: Show help")
+    self:CPrint("list: List the status of all mobs")
+    self:CPrint("spam <name>: Broadcast the spawn timer")
 end
 
 -----------------------------------------------------------------------------------------------
@@ -118,10 +146,12 @@ function RareTimer:OnTargetUnitChanged(targetID)
     self:UpdateStatus(targetID, Source.Target)
 end
 
--- Capture mobs as they're killed
+-- Capture mobs as they're killed/damaged
 function RareTimer:OnCombatLogDamage(tEventArgs)
     if tEventArgs.bTargetKilled then
-	self:UpdateStatus(tEventArgs.unitTarget, Source.Kill)
+        self:UpdateStatus(tEventArgs.unitTarget, Source.Kill)
+    else
+        self:UpdateStatus(tEventArgs.unitTarget, Source.Combat)
     end
 end
 
@@ -141,122 +171,125 @@ end
 
 -- Update the status of a rare mob
 function RareTimer:UpdateStatus(unit, source)
-    if self:IsMob(unit) and self:IsNotable(name) then
-	--Time table: { nDay, nDayOfWeek, nHour, nMonth, nSecond, nYear, strFormattedTime }
-	local time = GameLib.GetServerTime()
-	local localTime = GameLib.GetLocalTime()
-	local name = unit:GetName()
-	local dead = unit:IsDead()
-	if dead then
-	    if source == Source.Kill then
-		strVerb = self:GetString('killed at')
-	    else
-		strVerb = self:GetString('seen dead at')
-	    end
-	    local strKilled = string.format("%s %s %s", name, strVerb, localTime.strFormattedTime)
-	    Print(strKilled)
-	else
-	    local health = self:GetHealth(unit)
-	    if health ~= nil then
-		local strAlive = string.format("%s (%s%%) %s %s", name, health, source .. self:GetString('seen at'), localTime.strFormattedTime)
-		Print(strAlive)
-	    end
-	end
+    if self:IsMob(unit) and self:IsNotable(unit:GetName()) then
+        if unit:IsDead() then
+            if source == Source.Kill then
+                self:SawKilled(unit)
+            else
+                self:SawDead(unit)
+            end
+        else
+            self:SawAlive(unit)
+        end
     end
 end
 
--- Get localized string
-function RareTimer:GetString(str)
-	return str
+-- Record a kill
+function RareTimer:SawKilled(unit)
+    local time = GameLib.GetServerTime()
+    local entry = self:GetEntry(name) or {}
+    entry.State = States.Killed
+    entry.Killed = time
+    entry.Timestamp = time
+    --entry.Expires = time + entry.MaxSpawn + self.db.config.Slack
+    --entry.Due = time + entry.MinSpawn
+    local strKilled = string.format(L["StateKilled"], time.strFormattedTime)
+    Print(string.format("%s %s", unit:GetName(), strKilled))
+end
+
+-- Record a corpse
+function RareTimer:SawDead(unit)
+    local time = GameLib.GetServerTime()
+    local entry = self:GetEntry(name) or {}
+    if entry.State ~= States.Killed then
+        entry.State = States.Dead
+        entry.Killed = time
+        entry.Timestamp = time
+        --entry.Expires = time + entry.MaxSpawn + self.db.config.Slack
+        --entry.Due = time + entry.MinSpawn
+    end
+end
+
+-- Record a live mob
+function RareTimer:SawAlive(unit)
+    local time = GameLib.GetServerTime()
+    local entry = self:GetEntry(name)
+    local health = self:GetHealth(unit)
+    local strState
+    if health ~= nil and entry ~= nil then
+        if health == 100 then
+            entry.State = States.Alive
+            strState = L["StateAlive"]
+        else
+            entry.State = States.InCombat
+            strState = L["StateInCombat"]
+        end
+        entry.Timestamp = time
+        local strAlive = string.format(strState, time.strFormattedTime)
+        Print(string.format("%s %s", unit:GetName(), strAlive))
+    end
 end
 
 -- Announce data to other clients
 function RareTimer:Announce(data)
-	for _, val in pairs(data) do
-		local t = {}
-		t.name = GameLib.GetPlayerUnit():GetName()
-		t.message = "Name State Timestamp RareTimerVersion"
-		self.chanICC:SendMessage(t)
-	end
+    for _, val in pairs(data) do
+        local t = {}
+        t.name = GameLib.GetPlayerUnit():GetName()
+        t.message = "Name State Timestamp RareTimerVersion"
+        self.chanICC:SendMessage(t)
+    end
 end
 
 -- Parse announcements from other clients
-function RareTimer:OnDotMessageRaretimerChannelMessage(channel, tMsg)
-	self.unitPlayerDisposition = GameLib.GetPlayerUnit()
-	if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
-		self.tQueuedUnits = {}
-		return
-	end	
-	if GameLib.GetPlayerUnit():GetName() == tMsg.name then return end
-	
-	if RegisteredUsers[tMsg.name] ~= nil and type(RegisteredUsers[tMsg.name]) == "table" then
-		if RegisteredUsers[tMsg.name].share ~= nil and tMsg.share == nil then return end
-		if RegisteredUsers[tMsg.name].nodetype ~= nil and tMsg.nodetype == nil then return end
-		
-		if RegisteredUsers[tMsg.name].version ~= nil and tMsg.senderversion ~= nil and RegisteredUsers[tMsg.name].version > tMsg.senderversion then return end
-		
-		if tMsg.timestamp == nil or (RegisteredUsers[tMsg.name].timestamp ~= nil and RegisteredUsers[tMsg.name].timestamp > tMsg.timestamp) then return end
-		
-		if type(RegisteredUsers[tMsg.name].share) == "table" then
-			RegisteredUsers[tMsg.name] = nil
-		end
-	end
-	
-	if tMsg.nodetype == nil then
-		if type(RegisteredUsers[tMsg.name]) == "table" then 
-			return
-		end
-		if type(tMsg.share) == "table" then return end
-		RegisteredUsers[tMsg.name] = tMsg.share
-	else
-		if tMsg.version ~= nil and tMsg.version > version then
-			self.wndMain:FindChild("VersionUpdate"):Show(true)
-		end
-	    RegisteredUsers[tMsg.name] = tMsg
-	end
-	--ChatSystemLib.PostOnChannel(2, tMsg.message)
+function RareTimer:OnRareTimerChannelMessage(channel, tMsg)
+    self:CPrint("Msg Received on " .. channel)
+    self.PrintTable(tMsg)
 end
 
--- Trigger periodic announcements
-function RareTimer:AnnounceTimer()
-	Print("Timer triggered")
-	--self.unitPlayerDisposition = GameLib.GetPlayerUnit()
-	--if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
-		--self.tQueuedUnits = {}
-		--return
-	--end	
+-- Trigger housekeeping/announcements
+function RareTimer:OnTimer()
+    Print("Timer triggered")
+    --self.unitPlayerDisposition = GameLib.GetPlayerUnit()
+    --if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
+        --self.tQueuedUnits = {}
+        --return
+    --end    
 end
 
 -- Calculate % mob health
 function RareTimer:GetHealth(unit)
     if unit ~= nil then
-	local health = unit:GetHealth()
-	local maxhealth = unit:GetMaxHealth()
-	if health ~= nil and maxhealth ~= nil then
-	    assert(type(health) == "number", "GetHealth returned invalid number")
-	    assert(type(maxhealth) == "number", "GetMaxHealth returned invalid number")
-	    if maxhealth > 0 then
-		return math.floor(health / maxhealth * 100)
-	    end
-	end
+        local health = unit:GetHealth()
+        local maxhealth = unit:GetMaxHealth()
+        if health ~= nil and maxhealth ~= nil then
+            assert(type(health) == "number", "GetHealth returned invalid number")
+            assert(type(maxhealth) == "number", "GetMaxHealth returned invalid number")
+            if maxhealth > 0 then
+                return math.floor(health / maxhealth * 100)
+            end
+        end
     end
 end
 
 -- Is this a mob we are interested in?
 function RareTimer:IsNotable(name)
-    if name ~= nil and (name == "Honeysting Barbtail" or name == "Scorchwing") then
-	return true
-    else
-	return false
+    if name == nil then
+        return false
     end
+    for _, entry in pairs(self.db.profile.mobs) do
+        if entry.Name == name then
+            return true
+        end
+    end
+    return false
 end
 
 -- Is this a mob?
 function RareTimer:IsMob(unit)
     if unit ~= nil and unit:IsValid() and unit:GetType() == 'NonPlayer' then
-	return true
+        return true
     else
-	return false
+        return false
     end
 end
 
@@ -266,21 +299,67 @@ function RareTimer:Spam(name, channel)
     --Spam health if alive, last death if dead
 end
 
+-- Get the db entry for a mob
+function RareTimer:GetEntry(name)
+    for _, mob in pairs(self.db.profile.mobs) do
+        if mob.Name == name then
+            return mob
+        end
+    end
+end
+
+-- Print to the Command channel
+function RareTimer:CPrint(msg)
+    ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Command, msg, "")
+end
+
+-- Print the contents of a table to the Command channel
+function RareTimer:PrintTable(table, depth)
+    if depth == nil then
+        depth = 0
+    end
+    if depth > 5 then
+        return
+    end
+
+    local indent = string.rep(' ', depth*2)
+    for name, value in pairs(table) do
+        if type(value) == 'table' then
+            if value.strFormattedTime ~= nil then
+                local strTimestamp = string.format('%i-%i-%i %s', value.nYear, value.nMonth, value.nDay, tostring(value.strFormattedTime))
+                self:CPrint(string.format("%s%s: %s", indent, name, strTimestamp))
+            else
+                self:CPrint(string.format("%s%s: {", indent, name))
+                self:PrintTable(value, depth + 1)
+                self:CPrint(string.format("%s}", indent))
+            end
+        else
+            self:CPrint(string.format("%s%s: %s", indent, name, tostring(value)))
+        end
+    end
+end    
 
 -----------------------------------------------------------------------------------------------
 -- RareTimerForm Functions
 -----------------------------------------------------------------------------------------------
 -- when the OK button is clicked
 function RareTimer:OnOK()
-	self.wndMain:Show(false) -- hide the window
+    self.wndMain:Show(false) -- hide the window
 end
 
 -- when the Cancel button is clicked
 function RareTimer:OnCancel()
-	self.wndMain:Show(false) -- hide the window
+    self.wndMain:Show(false) -- hide the window
 end
 
+-- Print status list
+function RareTimer:ShowList()
+    self:CPrint("Not yet implemented")
+end
+
+-----------------------------------------------------------------------------------------------
 -- Junk !
+-----------------------------------------------------------------------------------------------
 
   --local disposition = unit:GetDispositionTo(GameLib.GetPlayerUnit())
 
@@ -310,3 +389,7 @@ end
     --Dead
     --Timestamp
     --Expires
+
+    --Time table: { nDay, nDayOfWeek, nHour, nMonth, nSecond, nYear, strFormattedTime }
+
+            --local strKilled = string.format("%s %s %s", name, strVerb, localTime.strFormattedTime)
