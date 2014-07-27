@@ -41,42 +41,40 @@ local States = {
     Expired = 6, -- Been longer than MaxSpawn since last known kill
 }
 
+local defaults = {
+    profile = {
+        config = {
+            LastBroadcast = nil,
+            Slack = 600, --10m, EstMax + Slack = Expired
+        },
+        mobs = {
+            ['**'] = {
+                --Name
+                State = States.Unknown,
+                --Killed
+                --Timestamp
+                --MinSpawn
+                --MaxSpawn
+                --Due
+                --Expires
+            },
+            {    
+                Name = L["Scorchwing"],
+                MinSpawn = 3600, --60m
+                MaxSpawn = 6600, --110m
+            },
+            {    
+                Name = L["Honeysting Barbtail"], 
+                MinSpawn = 120, --2m
+                MaxSpawn = 600, --10m
+            }
+        }
+    }
+}
 -----------------------------------------------------------------------------------------------
 -- RareTimer OnInitialize
 -----------------------------------------------------------------------------------------------
 function RareTimer:OnInitialize()
-    local defaults = {
-        profile = {
-            config = {
-                SpamParty = false,
-                SpamGuild = false,
-                SpamZone = false,
-                Slack = 600, --10m, EstMax + Slack = Expired
-            },
-            mobs = {
-                ['**'] = {
-                    --Name
-                    State = States.Unknown,
-                    --Killed
-                    --Timestamp
-                    --MinSpawn
-                    --MaxSpawn
-                    --Due
-                    --Expires
-                },
-                {    
-                    Name = L["Scorchwing"],
-                    MinSpawn = 3600, --60m
-                    MaxSpawn = 6600, --110m
-                },
-                {    
-                    Name = L["Honeysting Barbtail"], 
-                    MinSpawn = 120, --2m
-                    MaxSpawn = 600, --10m
-                }
-            }
-        }
-    }
     self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
     -- load our form file
@@ -88,7 +86,6 @@ end
 -----------------------------------------------------------------------------------------------
 function RareTimer:OnEnable()
     if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
-        -- Init
         -- Slash commands
         Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
 
@@ -116,12 +113,13 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
     if s ~= nil and s ~= '' and s ~= 'help' then
         if s == "list" then
             self:ShowList()
-        elseif s == "spam" then
+        elseif s:find("spam ") == 1 then
+            self:Spam(sInput)
         elseif s == "debug" then
             self:PrintTable(self.db.profile.mobs)
         end
     else
-        self:ShowHelp()
+        self:ShowHelp(s)
     end
     --Print(inspect(self.db))
     --for a,b in pairs(L) do
@@ -130,15 +128,19 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
     --Print("RareTimer!")
     --self.wndMain:Show(true) -- show the window (Need to init before we can use)
 end
-function RareTimer:ShowHelp()
-    self:CPrint("RareTimer commands:")
-    self:CPrint("help <command>: Show help")
-    self:CPrint("list: List the status of all mobs")
-    self:CPrint("spam <name>: Broadcast the spawn timer")
+function RareTimer:ShowHelp(input)
+    if input == nil or input == '' then
+        self:CPrint("RareTimer commands:")
+        self:CPrint("help <command>: Show help")
+        self:CPrint("list: List the status of all mobs")
+        self:CPrint("spam <channel> <name>: Broadcast the spawn time")
+    else
+        self:CPrint("Not yet implemented")
+    end
 end
 
 -----------------------------------------------------------------------------------------------
--- Event callbacks
+-- Event handlers
 -----------------------------------------------------------------------------------------------
 
 -- Capture mobs as they're targeted
@@ -318,7 +320,7 @@ function RareTimer:PrintTable(table, depth)
     if depth == nil then
         depth = 0
     end
-    if depth > 5 then
+    if depth > 10 then
         return
     end
 
@@ -326,7 +328,7 @@ function RareTimer:PrintTable(table, depth)
     for name, value in pairs(table) do
         if type(value) == 'table' then
             if value.strFormattedTime ~= nil then
-                local strTimestamp = string.format('%i-%i-%i %s', value.nYear, value.nMonth, value.nDay, tostring(value.strFormattedTime))
+                local strTimestamp = string.format('%d-%02d-%02d %s', value.nYear, value.nMonth, value.nDay, value.strFormattedTime)
                 self:CPrint(string.format("%s%s: %s", indent, name, strTimestamp))
             else
                 self:CPrint(string.format("%s%s: {", indent, name))
