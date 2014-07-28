@@ -1,5 +1,15 @@
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RareTimer", "enUS", true)
 
+--Command strings
+L["CmdListHeading"] = "RareTimer status list:"
+
+--Time strings
+L["s"] = true -- Seconds
+L["m"] = true -- Minutes
+L["h"] = true -- Hours
+L["d"] = true -- Days
+L["ago"] = true
+
 -- State strings
 L["StateUnknown"] = 'Unknown'
 L["StateKilled"] = 'Killed at %s'

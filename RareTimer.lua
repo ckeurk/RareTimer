@@ -45,7 +45,7 @@ local defaults = {
     profile = {
         config = {
             LastBroadcast = nil,
-            Slack = 600, --10m, EstMax + Slack = Expired
+            Slack = 600, --10m, MaxSpawn + Slack = Expired
         },
         mobs = {
             ['**'] = {
@@ -99,7 +99,7 @@ function RareTimer:OnEnable()
         self.chanICC = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
 
         -- Timers
-        --self.timer = ApolloTimer.Create(5.0, true, "onTimer", self) -- In seconds
+        self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
     end
 end
 
@@ -112,11 +112,15 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
     local s = string.lower(sInput)
     if s ~= nil and s ~= '' and s ~= 'help' then
         if s == "list" then
-            self:ShowList()
+            self:CmdList(s)
         elseif s:find("spam ") == 1 then
-            self:Spam(sInput)
+            self:CmdSpam(s)
         elseif s == "debug" then
             self:PrintTable(self.db.profile.mobs)
+        elseif s == "moo" then
+            local e = self:GetEntry('Scorchwing')
+            local d = self:DiffTime(GameLib.GetServerTime(), e.Killed)
+            self:CPrint(self:DurToStr(d))
         end
     else
         self:ShowHelp(s)
@@ -145,26 +149,26 @@ end
 
 -- Capture mobs as they're targeted
 function RareTimer:OnTargetUnitChanged(targetID)
-    self:UpdateStatus(targetID, Source.Target)
+    self:UpdateEntry(targetID, Source.Target)
 end
 
 -- Capture mobs as they're killed/damaged
 function RareTimer:OnCombatLogDamage(tEventArgs)
     if tEventArgs.bTargetKilled then
-        self:UpdateStatus(tEventArgs.unitTarget, Source.Kill)
+        self:UpdateEntry(tEventArgs.unitTarget, Source.Kill)
     else
-        self:UpdateStatus(tEventArgs.unitTarget, Source.Combat)
+        self:UpdateEntry(tEventArgs.unitTarget, Source.Combat)
     end
 end
 
 -- Capture newly loaded/spawned mobs
 function RareTimer:OnUnitCreated(unit)
-    self:UpdateStatus(unit, Source.Create)
+    self:UpdateEntry(unit, Source.Create)
 end
 
 -- Capture mobs as they despawn
 function RareTimer:OnUnitDestroyed(unit)
-    self:UpdateStatus(unit, Source.Destroy)
+    self:UpdateEntry(unit, Source.Destroy)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -172,7 +176,7 @@ end
 -----------------------------------------------------------------------------------------------
 
 -- Update the status of a rare mob
-function RareTimer:UpdateStatus(unit, source)
+function RareTimer:UpdateEntry(unit, source)
     if self:IsMob(unit) and self:IsNotable(unit:GetName()) then
         if unit:IsDead() then
             if source == Source.Kill then
@@ -234,6 +238,7 @@ end
 
 -- Announce data to other clients
 function RareTimer:Announce(data)
+    --todo: sort?
     for _, val in pairs(data) do
         local t = {}
         t.name = GameLib.GetPlayerUnit():GetName()
@@ -250,7 +255,9 @@ end
 
 -- Trigger housekeeping/announcements
 function RareTimer:OnTimer()
-    Print("Timer triggered")
+    --Print("Timer triggered")
+    self:UpdateState()
+
     --self.unitPlayerDisposition = GameLib.GetPlayerUnit()
     --if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
         --self.tQueuedUnits = {}
@@ -295,10 +302,53 @@ function RareTimer:IsMob(unit)
     end
 end
 
--- Spam status of a given mob
-function RareTimer:Spam(name, channel)
+-- Spam status of a given mob to a channel
+function RareTimer:CmdSpam(input)
     --Guild/zone/party
     --Spam health if alive, last death if dead
+    self:CPrint("Not yet implemented")
+end
+
+-- Print status list
+function RareTimer:CmdList(input)
+    self:CPrint(L["CmdListHeading"])
+    for _, mob in pairs(self.db.profile.mobs) do
+        self:CPrint(self:GetStatusStr(mob))
+    end
+end
+
+-- Generate a status string for a given entry
+function RareTimer:GetStatusStr(entry)
+    local when
+    local strState = 'ERROR'
+    if entry.State == States.Unknown then
+        strState = L["StateUnknown"]
+        when = entry.Timestamp
+    elseif entry.State == States.Killed then
+        strState = L["StateKilled"]
+        when = entry.Killed
+    elseif entry.State == States.Dead then
+        strState = L["StateDead"]
+        when = entry.Killed
+    elseif entry.State == States.Pending then
+        strState = L["StatePending"]
+        when = entry.Due
+    elseif entry.State == States.Alive then
+        strState = L["StateAlive"]
+        when = entry.Timestamp
+    elseif entry.State == States.InCombat then
+        strState = L["StateInCombat"]
+        when = entry.Timestamp
+    elseif entry.State == States.Expired then
+        strState = L["StateExpired"]
+        when = entry.Timestamp
+    end
+    if when == nil then
+        when = GameLib.GetServerTime()
+        when.nYear = 1970
+    end
+    local strWhen = string.format('%d-%02d-%02d %s', when.nYear, when.nMonth, when.nDay, when.strFormattedTime)
+    return string.format("%s: %s", entry.Name, string.format(strState, strWhen))
 end
 
 -- Get the db entry for a mob
@@ -312,6 +362,10 @@ end
 
 -- Print to the Command channel
 function RareTimer:CPrint(msg)
+    if msg == nil then
+        msg = ''
+    end
+
     ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Command, msg, "")
 end
 
@@ -341,6 +395,95 @@ function RareTimer:PrintTable(table, depth)
     end
 end    
 
+-- Progress state (expire entries, etc.)
+function RareTimer:UpdateState()
+    for _, mob in pairs(self.db.profile.mobs) do
+        local now = GameLib.GetServerTime()
+        local ago = self:DiffTime(now, mob.Timestamp)
+        local killedAgo = self:DiffTime(now, mob.Killed)
+        local maxAge = mob.MaxSpawn + self.db.profile.config.Slack
+
+        -- Expire entries
+        if mob.State ~= States.Unknown and mob.State ~= States.Expired and (ago > maxAge or killedAgo > maxAge) then
+            mob.State = States.Expired
+            return
+        -- Set pending spawn
+        elseif (mob.State == States.Killed and killedAgo > mob.MinSpawn)
+            or (mob.State == States.Dead and killedAgo > mob.MinSpawn - self.db.profile.config.Slack) then
+            mob.State = States.Pending
+            mob.Timestamp = now
+            return
+        end
+    end
+end
+
+-- Convert Wildstar time to lua time
+function RareTimer:ToLuaTime(wsTime)
+    local convert = {
+        year = wsTime.nYear,
+        month = wsTime.nMonth,
+        day = wsTime.nDay,
+        hour = wsTime.nHour,
+        min = wsTime.nMin,
+        sec = wsTime.nSec
+    }
+    return os.time(convert)
+end
+
+-- Convert lua time to Wildstar time
+function RareTimer:ToWsTime(luaTime)
+    local date = os.date('*t', luaTime)
+    local convert = {
+        nYear = luaTime.nYear,
+        nMonth = luaTime.nMonth,
+        nDay = luaTime.nDay,
+        nHour = luaTime.nHour,
+        nMin = luaTime.nMin,
+        nSec = luaTime.nSec
+    }
+    return convert
+end
+
+-- Measure difference between two times (in seconds)
+function RareTimer:DiffTime(wsT2, wsT1)
+    local t1 = self:ToLuaTime(wsT1)
+    local t2 = self:ToLuaTime(wsT2)
+    return os.difftime(t2, t1)
+end
+
+-- Convert a duration in seconds to a shortform string
+function RareTimer:DurToStr(dur)
+    local min = 0
+    local hour = 0
+    local day = 0
+
+    if dur > 59 then
+        dur = math.floor(dur/60) 
+        min = dur % 60
+        if dur > 59 then
+            dur = math.floor(dur/60) 
+            hour = dur % 60
+            if dur > 23 then
+                day = dur % 24
+            end
+        end
+    end
+
+    local strOutput = ''
+    if hour > 0 then
+        strOutput = string.format("%02d%s", min, L["m"])
+    else
+        strOutput = string.format("%d%s", min, L["m"])
+    end
+    if hour > 0 then
+        strOutput = string.format("%d%s", hour, L["h"]) .. strOutput
+    end
+    if day > 0 then
+        strOutput = string.format("%d%s", day, L["d"]) .. strOutput
+    end
+    return strOutput
+end
+
 -----------------------------------------------------------------------------------------------
 -- RareTimerForm Functions
 -----------------------------------------------------------------------------------------------
@@ -352,11 +495,6 @@ end
 -- when the Cancel button is clicked
 function RareTimer:OnCancel()
     self.wndMain:Show(false) -- hide the window
-end
-
--- Print status list
-function RareTimer:ShowList()
-    self:CPrint("Not yet implemented")
 end
 
 -----------------------------------------------------------------------------------------------
