@@ -46,6 +46,7 @@ local defaults = {
         config = {
             LastBroadcast = nil,
             Slack = 600, --10m, MaxSpawn + Slack = Expired
+            CombatTimeout = 300, -- 5m
         },
         mobs = {
             ['**'] = {
@@ -57,6 +58,7 @@ local defaults = {
                 --MaxSpawn
                 --Due
                 --Expires
+                --LastReport
             },
             {    
                 Name = L["Scorchwing"],
@@ -67,7 +69,12 @@ local defaults = {
                 Name = L["Honeysting Barbtail"], 
                 MinSpawn = 120, --2m
                 MaxSpawn = 600, --10m
-            }
+            },
+            {    
+                Name = L["Scorchwing Scorchling"], 
+                MinSpawn = 120, --2m
+                MaxSpawn = 600, --10m
+            },
         }
     }
 }
@@ -100,6 +107,7 @@ function RareTimer:OnEnable()
 
         -- Timers
         self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
+        SendVarToRover("Mobs", self.db.profile.mobs)
     end
 end
 
@@ -117,10 +125,8 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self:CmdSpam(s)
         elseif s == "debug" then
             self:PrintTable(self.db.profile.mobs)
-        elseif s == "moo" then
-            local e = self:GetEntry('Scorchwing')
-            local d = self:DiffTime(GameLib.GetServerTime(), e.Killed)
-            self:CPrint(self:DurToStr(d))
+        elseif s == "update" then
+            self:OnTimer()
         end
     else
         self:ShowHelp(s)
@@ -193,20 +199,21 @@ end
 -- Record a kill
 function RareTimer:SawKilled(unit)
     local time = GameLib.GetServerTime()
-    local entry = self:GetEntry(name) or {}
+    local localtime = GameLib.GetLocalTime()
+    local entry = self:GetEntry(unit:GetName()) or {}
     entry.State = States.Killed
     entry.Killed = time
     entry.Timestamp = time
     --entry.Expires = time + entry.MaxSpawn + self.db.config.Slack
     --entry.Due = time + entry.MinSpawn
-    local strKilled = string.format(L["StateKilled"], time.strFormattedTime)
-    Print(string.format("%s %s", unit:GetName(), strKilled))
+    local strKilled = string.format(L["StateKilled"], localtime.strFormattedTime)
+    --Print(string.format("%s %s", unit:GetName(), strKilled))
 end
 
 -- Record a corpse
 function RareTimer:SawDead(unit)
     local time = GameLib.GetServerTime()
-    local entry = self:GetEntry(name) or {}
+    local entry = self:GetEntry(unit:GetName()) or {}
     if entry.State ~= States.Killed then
         entry.State = States.Dead
         entry.Killed = time
@@ -219,7 +226,7 @@ end
 -- Record a live mob
 function RareTimer:SawAlive(unit)
     local time = GameLib.GetServerTime()
-    local entry = self:GetEntry(name)
+    local entry = self:GetEntry(unit:GetName())
     local health = self:GetHealth(unit)
     local strState
     if health ~= nil and entry ~= nil then
@@ -232,7 +239,7 @@ function RareTimer:SawAlive(unit)
         end
         entry.Timestamp = time
         local strAlive = string.format(strState, time.strFormattedTime)
-        Print(string.format("%s %s", unit:GetName(), strAlive))
+        --Print(string.format("%s %s", unit:GetName(), strAlive))
     end
 end
 
@@ -257,6 +264,7 @@ end
 function RareTimer:OnTimer()
     --Print("Timer triggered")
     self:UpdateState()
+    self:BroadcastDB()
 
     --self.unitPlayerDisposition = GameLib.GetPlayerUnit()
     --if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
@@ -282,7 +290,7 @@ end
 
 -- Is this a mob we are interested in?
 function RareTimer:IsNotable(name)
-    if name == nil then
+    if name == nil or name == '' then
         return false
     end
     for _, entry in pairs(self.db.profile.mobs) do
@@ -347,8 +355,13 @@ function RareTimer:GetStatusStr(entry)
         when = GameLib.GetServerTime()
         when.nYear = 1970
     end
-    local strWhen = string.format('%d-%02d-%02d %s', when.nYear, when.nMonth, when.nDay, when.strFormattedTime)
+    local strWhen = self:FormatDate(when)
     return string.format("%s: %s", entry.Name, string.format(strState, strWhen))
+end
+
+-- Convert a date to a string in the format YYYY-MM-DD hh:mm:ss pp
+function RareTimer:FormatDate(date)
+    return string.format('%d-%02d-%02d %s', date.nYear, date.nMonth, date.nDay, date.strFormattedTime)
 end
 
 -- Get the db entry for a mob
@@ -382,7 +395,7 @@ function RareTimer:PrintTable(table, depth)
     for name, value in pairs(table) do
         if type(value) == 'table' then
             if value.strFormattedTime ~= nil then
-                local strTimestamp = string.format('%d-%02d-%02d %s', value.nYear, value.nMonth, value.nDay, value.strFormattedTime)
+                local strTimestamp = self:FormatDate(value)
                 self:CPrint(string.format("%s%s: %s", indent, name, strTimestamp))
             else
                 self:CPrint(string.format("%s%s: {", indent, name))
@@ -397,19 +410,39 @@ end
 
 -- Progress state (expire entries, etc.)
 function RareTimer:UpdateState()
+    local ago
+    local killedAgo
+    local maxAge
+    local now = GameLib.GetServerTime()
+    -- Now is nil while loading
+    if now == nil then
+        return
+    end
     for _, mob in pairs(self.db.profile.mobs) do
-        local now = GameLib.GetServerTime()
-        local ago = self:DiffTime(now, mob.Timestamp)
-        local killedAgo = self:DiffTime(now, mob.Killed)
-        local maxAge = mob.MaxSpawn + self.db.profile.config.Slack
-
+        if mob.Timestamp ~= nil then
+            ago = self:DiffTime(now, mob.Timestamp)
+        else
+            ago = nil
+        end
+        if mob.Killed ~= nil then
+            killedAgo = self:DiffTime(now, mob.Killed)
+        else
+            killedAgo = nil
+        end
+        maxAge = mob.MaxSpawn + self.db.profile.config.Slack
         -- Expire entries
-        if mob.State ~= States.Unknown and mob.State ~= States.Expired and (ago > maxAge or killedAgo > maxAge) then
+        if mob.State ~= States.Unknown and mob.State ~= States.Expired
+            and ((ago ~= nil and ago > maxAge) or (killedAgo ~= nil and killedAgo > maxAge)) then
             mob.State = States.Expired
+            mob.Timestamp = now
+            return
+        elseif mob.State == States.InCombat and (ago == nil or ago > self.db.profile.config.CombatTimeout) then
+            mob.State = States.Expired
+            mob.Timestamp = now
             return
         -- Set pending spawn
-        elseif (mob.State == States.Killed and killedAgo > mob.MinSpawn)
-            or (mob.State == States.Dead and killedAgo > mob.MinSpawn - self.db.profile.config.Slack) then
+        elseif killedAgo ~= nil and ((mob.State == States.Killed and killedAgo > mob.MinSpawn)
+            or (mob.State == States.Dead and killedAgo > mob.MinSpawn - self.db.profile.config.Slack)) then
             mob.State = States.Pending
             mob.Timestamp = now
             return
@@ -424,8 +457,8 @@ function RareTimer:ToLuaTime(wsTime)
         month = wsTime.nMonth,
         day = wsTime.nDay,
         hour = wsTime.nHour,
-        min = wsTime.nMin,
-        sec = wsTime.nSec
+        min = wsTime.nMinute,
+        sec = wsTime.nSecond
     }
     return os.time(convert)
 end
@@ -434,12 +467,12 @@ end
 function RareTimer:ToWsTime(luaTime)
     local date = os.date('*t', luaTime)
     local convert = {
-        nYear = luaTime.nYear,
-        nMonth = luaTime.nMonth,
-        nDay = luaTime.nDay,
-        nHour = luaTime.nHour,
-        nMin = luaTime.nMin,
-        nSec = luaTime.nSec
+        nYear = luaTime.year,
+        nMonth = luaTime.month,
+        nDay = luaTime.day,
+        nHour = luaTime.hour,
+        nMinute = luaTime.min,
+        nSecond = luaTime.sec
     }
     return convert
 end
@@ -448,6 +481,7 @@ end
 function RareTimer:DiffTime(wsT2, wsT1)
     local t1 = self:ToLuaTime(wsT1)
     local t2 = self:ToLuaTime(wsT2)
+
     return os.difftime(t2, t1)
 end
 
@@ -482,6 +516,10 @@ function RareTimer:DurToStr(dur)
         strOutput = string.format("%d%s", day, L["d"]) .. strOutput
     end
     return strOutput
+end
+
+-- Send contents of DB to other clients (if needed)
+function RareTimer:BroadcastDB()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -533,3 +571,5 @@ end
     --Time table: { nDay, nDayOfWeek, nHour, nMonth, nSecond, nYear, strFormattedTime }
 
             --local strKilled = string.format("%s %s %s", name, strVerb, localTime.strFormattedTime)
+            --
+            --Trigger events: Rare mob alive, rare mob dead
