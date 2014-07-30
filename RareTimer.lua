@@ -47,6 +47,7 @@ local defaults = {
             LastBroadcast = nil,
             Slack = 600, --10m, MaxSpawn + Slack = Expired
             CombatTimeout = 300, -- 5m
+            TZOffset = 0 -- Localtime offset from servertime
         },
         mobs = {
             ['**'] = {
@@ -56,7 +57,8 @@ local defaults = {
                 --Timestamp
                 --MinSpawn
                 --MaxSpawn
-                --Due
+                --MinDue
+                --MaxDue
                 --Expires
                 --LastReport
             },
@@ -108,6 +110,9 @@ function RareTimer:OnEnable()
         -- Timers
         self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
         SendVarToRover("Mobs", self.db.profile.mobs)
+
+        -- Config
+        self.db.profile.config.TZOffset = self:GetTZOffset()
     end
 end
 
@@ -125,6 +130,8 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self:CmdSpam(s)
         elseif s == "debug" then
             self:PrintTable(self.db.profile.mobs)
+        elseif s == "debugconfig" then
+            self:PrintTable(self.db.profile.config)
         elseif s == "update" then
             self:OnTimer()
         end
@@ -204,8 +211,7 @@ function RareTimer:SawKilled(unit)
     entry.State = States.Killed
     entry.Killed = time
     entry.Timestamp = time
-    --entry.Expires = time + entry.MaxSpawn + self.db.config.Slack
-    --entry.Due = time + entry.MinSpawn
+    self:UpdateDue(entry)
     local strKilled = string.format(L["StateKilled"], localtime.strFormattedTime)
     --Print(string.format("%s %s", unit:GetName(), strKilled))
 end
@@ -218,8 +224,7 @@ function RareTimer:SawDead(unit)
         entry.State = States.Dead
         entry.Killed = time
         entry.Timestamp = time
-        --entry.Expires = time + entry.MaxSpawn + self.db.config.Slack
-        --entry.Due = time + entry.MinSpawn
+        self:UpdateDue(entry)
     end
 end
 
@@ -355,7 +360,7 @@ function RareTimer:GetStatusStr(entry)
         when = GameLib.GetServerTime()
         when.nYear = 1970
     end
-    local strWhen = self:FormatDate(when)
+    local strWhen = self:FormatDate(self:LocalTime(when))
     return string.format("%s: %s", entry.Name, string.format(strState, strWhen))
 end
 
@@ -450,6 +455,27 @@ function RareTimer:UpdateState()
     end
 end
 
+-- Set the estimated spawn window
+function RareTimer:UpdateDue(entry)
+        local adjust
+        if entry.State == States.Dead then
+            adjust = self.db.profile.config.Slack
+        else
+            adjust = 0
+        end
+
+        if entry.MinSpawn ~= nil and entry.MinSpawn > 0 then
+            entry.MinDue = self:ToWsTime(self:ToLuaTime(entry.Killed) + entry.MinSpawn - adjust)
+        else
+            entry.MinDue = nil
+        end
+        if entry.MaxSpawn ~= nil and entry.MaxSpawn > 0 then
+            entry.MaxDue = self:ToWsTime(self:ToLuaTime(entry.Killed) + entry.MaxSpawn)
+        else
+            entry.MaxDue = nil
+        end
+end
+
 -- Convert Wildstar time to lua time
 function RareTimer:ToLuaTime(wsTime)
     local convert = {
@@ -467,12 +493,13 @@ end
 function RareTimer:ToWsTime(luaTime)
     local date = os.date('*t', luaTime)
     local convert = {
-        nYear = luaTime.year,
-        nMonth = luaTime.month,
-        nDay = luaTime.day,
-        nHour = luaTime.hour,
-        nMinute = luaTime.min,
-        nSecond = luaTime.sec
+        nYear = date.year,
+        nMonth = date.month,
+        nDay = date.day,
+        nHour = date.hour,
+        nMinute = date.min,
+        nSecond = date.sec,
+        strFormattedTime = os.date('%I:%M:%S %p', luaTime)
     }
     return convert
 end
@@ -520,6 +547,19 @@ end
 
 -- Send contents of DB to other clients (if needed)
 function RareTimer:BroadcastDB()
+    --todo
+end
+
+-- Convert server time to local time
+function RareTimer:LocalTime(date)
+    local serverTime = self:ToLuaTime(date)
+    local localTime = serverTime + self.db.profile.config.TZOffset
+    return self:ToWsTime(localTime)
+end
+
+-- Calculate the offset between server time and local time
+function RareTimer:GetTZOffset()
+    return self:DiffTime(GameLib.GetLocalTime(), GameLib.GetServerTime())
 end
 
 -----------------------------------------------------------------------------------------------
@@ -573,3 +613,5 @@ end
             --local strKilled = string.format("%s %s %s", name, strVerb, localTime.strFormattedTime)
             --
             --Trigger events: Rare mob alive, rare mob dead
+    --todo: Barbtail goes unknown too quickly after alive
+    --todo: Use DurToStr to add next spawn to list

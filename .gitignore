@@ -54,6 +54,7 @@ Icon
 
 # Editor turds
 .*.swp
+.*.swo
 *~
 
 # Generated
