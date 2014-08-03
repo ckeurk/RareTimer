@@ -44,11 +44,13 @@ local States = {
 local defaults = {
     profile = {
         config = {
-            LastBroadcast = nil,
             Slack = 600, --10m, MaxSpawn + Slack = Expired
             CombatTimeout = 300, -- 5m
-            TZOffset = 0 -- Localtime offset from servertime
         },
+    },
+    realm = {
+        LastBroadcast = nil,
+        TZOffset = 0, -- Localtime offset from servertime
         mobs = {
             ['**'] = {
                 --Name
@@ -114,7 +116,7 @@ function RareTimer:OnEnable()
 
         -- Timers
         self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
-        SendVarToRover("Mobs", self.db.profile.mobs)
+        --SendVarToRover("Mobs", self.db.realm.mobs)
 
         -- Config
         self.db.profile.config.TZOffset = self:GetTZOffset()
@@ -138,7 +140,7 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
         elseif s:find("spam ") == 1 then
             self:CmdSpam(s)
         elseif s == "debug" then
-            self:PrintTable(self.db.profile.mobs)
+            self:PrintTable(self:GetEntries())
         elseif s == "debugconfig" then
             self:PrintTable(self.db.profile.config)
         elseif s == "update" then
@@ -333,7 +335,7 @@ function RareTimer:IsNotable(name)
     if name == nil or name == '' then
         return false
     end
-    for _, entry in pairs(self.db.profile.mobs) do
+    for _, entry in pairs(self:GetEntries()) do
         if entry.Name == name then
             return true
         end
@@ -360,7 +362,7 @@ end
 -- Print status list
 function RareTimer:CmdList(input)
     self:CPrint(L["CmdListHeading"])
-    for _, mob in pairs(self.db.profile.mobs) do
+    for _, mob in pairs(self:GetEntries()) do
         self:CPrint(self:GetStatusStr(mob))
     end
 end
@@ -406,7 +408,7 @@ end
 
 -- Get the db entry for a mob
 function RareTimer:GetEntry(name)
-    for _, mob in pairs(self.db.profile.mobs) do
+    for _, mob in pairs(self:GetEntries()) do
         if mob.Name == name then
             return mob
         end
@@ -450,7 +452,7 @@ end
 
 -- Progress state (expire entries, etc.)
 function RareTimer:UpdateState()
-    for _, mob in pairs(self.db.profile.mobs) do
+    for _, mob in pairs(self:GetEntries()) do
         -- Expire entries
         if mob.State ~= States.Unknown and mob.State ~= States.Expired and self:IsExpired(mob) then
             self:SetState(mob, States.Expired)
@@ -623,13 +625,18 @@ end
 -- Convert server time to local time
 function RareTimer:LocalTime(date)
     local serverTime = self:ToLuaTime(date)
-    local localTime = serverTime + self.db.profile.config.TZOffset
+    local localTime = serverTime + self.db.realm.TZOffset
     return self:ToWsTime(localTime)
 end
 
 -- Calculate the offset between server time and local time
 function RareTimer:GetTZOffset()
     return self:DiffTime(GameLib.GetLocalTime(), GameLib.GetServerTime())
+end
+
+-- Get the list of mob entries
+function RareTimer:GetEntries()
+    return self.db.realm.mobs
 end
 
 -----------------------------------------------------------------------------------------------
