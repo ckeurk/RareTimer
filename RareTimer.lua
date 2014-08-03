@@ -6,6 +6,8 @@
 require "Window"
 require "math"
 require "string"
+require "GameLib"
+require "ICCommLib"
  
 -----------------------------------------------------------------------------------------------
 -- RareTimer Module Definition
@@ -14,8 +16,6 @@ local RareTimer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("RareT
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("RareTimer", true) -- Silent = true
 local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
 
-
- 
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -88,6 +88,10 @@ function RareTimer:OnInitialize()
 
     -- load our form file
     self.xmlDoc = XmlDoc.CreateFromFile("RareTimer.xml")
+    self.xmlDoc:RegisterCallback("OnDocLoaded", self)
+    
+    -- Init
+    self.IsLoading = false
 end
 
 -----------------------------------------------------------------------------------------------
@@ -103,6 +107,7 @@ function RareTimer:OnEnable()
         Apollo.RegisterEventHandler("TargetUnitChanged", "OnTargetUnitChanged", self)
         Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
         Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
+        Apollo.RegisterEventHandler("ChangeWorld", "OnChangeWorld", self)
 
         -- Status update channel
         self.chanICC = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
@@ -113,6 +118,10 @@ function RareTimer:OnEnable()
 
         -- Config
         self.db.profile.config.TZOffset = self:GetTZOffset()
+        
+        -- Window
+        self.wndMain = Apollo.LoadForm(self.xmlDoc, "RareTimerForm", nil, self)
+        self.wndMain:Show(false)
     end
 end
 
@@ -134,6 +143,10 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self:PrintTable(self.db.profile.config)
         elseif s == "update" then
             self:OnTimer()
+        elseif s == "show" then
+            self.wndMain:Show(true)
+        elseif s == "hide" then
+            self.wndMain:Show(false)
         end
     else
         self:ShowHelp(s)
@@ -143,8 +156,8 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
         --Print("A: " .. a .. " B: " .. b)
     --end
     --Print("RareTimer!")
-    --self.wndMain:Show(true) -- show the window (Need to init before we can use)
 end
+
 function RareTimer:ShowHelp(input)
     if input == nil or input == '' then
         self:CPrint("RareTimer commands:")
@@ -184,6 +197,39 @@ function RareTimer:OnUnitDestroyed(unit)
     self:UpdateEntry(unit, Source.Destroy)
 end
 
+-- Detect if we're loading a new map (and various things are unavailable)
+function RareTimer:OnChangeWorld()
+    self.IsLoading = true
+    self.timer:Stop()
+    if self.LoadingTimer == nil then
+        self.LoadingTimer = ApolloTimer.Create(1, true, "OnLoadingTimer", self) -- In seconds
+    else
+        self.LoadingTimer:Start()
+    end
+end
+
+-- Check if we're done loading
+function RareTimer:OnLoadingTimer()
+    if IsLoading == false or GameLib.GetPlayerUnit() ~= nil then
+        self.IsLoading = false
+        self.LoadingTimer:Stop()
+        self.timer:Start()
+    end
+end
+
+-- Trigger housekeeping/announcements
+function RareTimer:OnTimer()
+    --Print("Timer triggered")
+    self:UpdateState()
+    self:BroadcastDB()
+
+    --self.unitPlayerDisposition = GameLib.GetPlayerUnit()
+    --if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
+        --self.tQueuedUnits = {}
+        --return
+    --end    
+end
+
 -----------------------------------------------------------------------------------------------
 -- RareTimer Functions
 -----------------------------------------------------------------------------------------------
@@ -207,20 +253,22 @@ end
 function RareTimer:SawKilled(unit)
     local time = GameLib.GetServerTime()
     local localtime = GameLib.GetLocalTime()
-    local entry = self:GetEntry(unit:GetName()) or {}
-    entry.State = States.Killed
-    entry.Killed = time
-    entry.Timestamp = time
-    self:UpdateDue(entry)
-    local strKilled = string.format(L["StateKilled"], localtime.strFormattedTime)
-    --Print(string.format("%s %s", unit:GetName(), strKilled))
+    local entry = self:GetEntry(unit:GetName())
+    if entry ~= nil then
+        entry.State = States.Killed
+        entry.Killed = time
+        entry.Timestamp = time
+        self:UpdateDue(entry)
+        --local strKilled = string.format(L["StateKilled"], localtime.strFormattedTime)
+        --Print(string.format("%s %s", unit:GetName(), strKilled))
+    end
 end
 
 -- Record a corpse
 function RareTimer:SawDead(unit)
     local time = GameLib.GetServerTime()
-    local entry = self:GetEntry(unit:GetName()) or {}
-    if entry.State ~= States.Killed then
+    local entry = self:GetEntry(unit:GetName())
+    if entry ~= nil and entry.State ~= States.Killed then
         entry.State = States.Dead
         entry.Killed = time
         entry.Timestamp = time
@@ -243,7 +291,7 @@ function RareTimer:SawAlive(unit)
             strState = L["StateInCombat"]
         end
         entry.Timestamp = time
-        local strAlive = string.format(strState, time.strFormattedTime)
+        --local strAlive = string.format(strState, time.strFormattedTime)
         --Print(string.format("%s %s", unit:GetName(), strAlive))
     end
 end
@@ -263,19 +311,6 @@ end
 function RareTimer:OnRareTimerChannelMessage(channel, tMsg)
     self:CPrint("Msg Received on " .. channel)
     self.PrintTable(tMsg)
-end
-
--- Trigger housekeeping/announcements
-function RareTimer:OnTimer()
-    --Print("Timer triggered")
-    self:UpdateState()
-    self:BroadcastDB()
-
-    --self.unitPlayerDisposition = GameLib.GetPlayerUnit()
-    --if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
-        --self.tQueuedUnits = {}
-        --return
-    --end    
 end
 
 -- Calculate % mob health
@@ -415,44 +450,79 @@ end
 
 -- Progress state (expire entries, etc.)
 function RareTimer:UpdateState()
-    local ago
-    local killedAgo
-    local maxAge
-    local now = GameLib.GetServerTime()
-    -- Now is nil while loading
-    if now == nil then
-        return
-    end
     for _, mob in pairs(self.db.profile.mobs) do
-        if mob.Timestamp ~= nil then
-            ago = self:DiffTime(now, mob.Timestamp)
-        else
-            ago = nil
-        end
-        if mob.Killed ~= nil then
-            killedAgo = self:DiffTime(now, mob.Killed)
-        else
-            killedAgo = nil
-        end
-        maxAge = mob.MaxSpawn + self.db.profile.config.Slack
         -- Expire entries
-        if mob.State ~= States.Unknown and mob.State ~= States.Expired
-            and ((ago ~= nil and ago > maxAge) or (killedAgo ~= nil and killedAgo > maxAge)) then
-            mob.State = States.Expired
-            mob.Timestamp = now
+        if mob.State ~= States.Unknown and mob.State ~= States.Expired and self:IsExpired(mob) then
+            self:SetState(mob, States.Expired)
             return
-        elseif mob.State == States.InCombat and (ago == nil or ago > self.db.profile.config.CombatTimeout) then
-            mob.State = States.Expired
-            mob.Timestamp = now
+        elseif mob.State == States.InCombat and self:IsCombatExpired(mob) then
+            self:SetState(mob, States.Expired)
             return
         -- Set pending spawn
-        elseif killedAgo ~= nil and ((mob.State == States.Killed and killedAgo > mob.MinSpawn)
-            or (mob.State == States.Dead and killedAgo > mob.MinSpawn - self.db.profile.config.Slack)) then
-            mob.State = States.Pending
-            mob.Timestamp = now
+        elseif self:IsDue(mob) then
+            self:SetState(mob, States.Pending)
             return
         end
     end
+end
+
+-- Check if an entry is due to spawn
+function RareTimer:IsDue(entry)
+    local killedAgo = self:GetAge(entry.Killed)
+    if killedAgo == nil then
+        return
+    end
+
+    -- Move the due time up if we only saw the corpse, not the kill
+    local due = entry.MinSpawn
+    if State == States.Dead then
+        due = due - self.db.profile.config.Slack
+    end
+
+    if (entry.State == States.Killed or entry.State == States.Dead) and killedAgo > due then
+        return true
+    else
+        return false
+    end
+end
+
+-- Check if an entry is expired
+function RareTimer:IsExpired(entry)
+    local ago = self:GetAge(entry.Timestamp)
+    local killedAgo = self:GetAge(entry.Killed)
+    local maxAge = entry.MaxSpawn + self.db.profile.config.Slack
+    if (ago ~= nil and ago > maxAge) or (killedAgo ~= nil and killedAgo > maxAge) then
+        return true
+    else
+        return false
+    end
+end
+
+-- Check if an entry is past the combat expiration time
+function RareTimer:IsCombatExpired(entry)
+    local ago = self:GetAge(entry.Timestamp)
+    if ago ~= nil and ago > self.db.profile.config.CombatTimeout then
+        return true
+    else
+        return false
+    end
+end
+
+-- Get the age in seconds
+function RareTimer:GetAge(timestamp)
+    if timestamp ~= nil then
+        local now = GameLib.GetServerTime()
+        return self:DiffTime(now, timestamp)
+    else
+        return nil
+    end
+end
+
+-- Set the entry's state
+function RareTimer:SetState(entry, state)
+    local now = GameLib.GetServerTime()
+    entry.State = state
+    entry.Timestamp = now
 end
 
 -- Set the estimated spawn window
