@@ -46,6 +46,11 @@ local defaults = {
         config = {
             Slack = 600, --10m, MaxSpawn + Slack = Expired
             CombatTimeout = 300, -- 5m
+            Track = {
+                L["Scorchwing"],
+                L["Honeysting Barbtail"],
+                L["Scorchwing Scorchling"],
+            }
         },
     },
     realm = {
@@ -57,8 +62,8 @@ local defaults = {
                 State = States.Unknown,
                 --Killed
                 --Timestamp
-                --MinSpawn
-                --MaxSpawn
+                MinSpawn = 0,
+                MaxSpawn = 86400, -- 1 day
                 --MinDue
                 --MaxDue
                 --Expires
@@ -70,12 +75,12 @@ local defaults = {
                 MaxSpawn = 6600, --110m
             },
             {    
-                Name = L["Honeysting Barbtail"], 
+                Name = L["Honeysting Barbtail"],
                 MinSpawn = 120, --2m
                 MaxSpawn = 600, --10m
             },
             {    
-                Name = L["Scorchwing Scorchling"], 
+                Name = L["Scorchwing Scorchling"],
                 MinSpawn = 120, --2m
                 MaxSpawn = 600, --10m
             },
@@ -149,6 +154,8 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self.wndMain:Show(true)
         elseif s == "hide" then
             self.wndMain:Show(false)
+        elseif s == "reset" then
+            self.db:ResetProfile()
         end
     else
         self:ShowHelp(s)
@@ -335,8 +342,8 @@ function RareTimer:IsNotable(name)
     if name == nil or name == '' then
         return false
     end
-    for _, entry in pairs(self:GetEntries()) do
-        if entry.Name == name then
+    for _, value in pairs(self.db.profile.config.Track) do
+        if value == name then
             return true
         end
     end
@@ -369,6 +376,10 @@ end
 
 -- Generate a status string for a given entry
 function RareTimer:GetStatusStr(entry)
+    if entry.Name == nil then
+        return nil
+    end
+
     local when
     local strState = 'ERROR'
     if entry.State == States.Unknown then
@@ -398,7 +409,8 @@ function RareTimer:GetStatusStr(entry)
         when.nYear = 1970
     end
     local strWhen = self:FormatDate(self:LocalTime(when))
-    return string.format("%s: %s", entry.Name, string.format(strState, strWhen))
+    local strStatus = string.format(strState, strWhen)
+    return string.format("%s: %s", entry.Name, strStatus)
 end
 
 -- Convert a date to a string in the format YYYY-MM-DD hh:mm:ss pp
