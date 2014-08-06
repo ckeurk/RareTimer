@@ -111,17 +111,18 @@ function RareTimer:OnEnable()
 
         -- Event handlers
         Apollo.RegisterEventHandler("CombatLogDamage", "OnCombatLogDamage", self)
+        Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", self)
         Apollo.RegisterEventHandler("TargetUnitChanged", "OnTargetUnitChanged", self)
         Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
         Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
         Apollo.RegisterEventHandler("ChangeWorld", "OnChangeWorld", self)
 
         -- Status update channel
-        self.chanICC = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
+        self.channel = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
 
         -- Timers
         self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
-        --SendVarToRover("Mobs", self.db.realm.mobs)
+        SendVarToRover("Mobs", self.db.realm.mobs)
 
         -- Config
         self.db.profile.config.TZOffset = self:GetTZOffset()
@@ -154,8 +155,13 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self.wndMain:Show(true)
         elseif s == "hide" then
             self.wndMain:Show(false)
+        elseif s == "toggle" then
+            self.wndMain:Toggle()
         elseif s == "reset" then
             self.db:ResetProfile()
+        elseif s == "test" then
+            self:SendTestData('Foo!')
+            self:SendTestData({msg='Bar', other='baz'})
         end
     else
         self:ShowHelp(s)
@@ -194,6 +200,11 @@ function RareTimer:OnCombatLogDamage(tEventArgs)
     else
         self:UpdateEntry(tEventArgs.unitTarget, Source.Combat)
     end
+end
+
+-- Capture mobs as they enter combat
+function RareTimer:OnUnitEnteredCombat(unit, bInCombat)
+    self:UpdateEntry(unit, Source.Combat)
 end
 
 -- Capture newly loaded/spawned mobs
@@ -237,6 +248,13 @@ function RareTimer:OnTimer()
         --self.tQueuedUnits = {}
         --return
     --end    
+end
+
+-- Parse announcements from other clients
+function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
+    tMsg.strSender = strSender
+    SendVarToRover('Msg', tMsg)
+    self:PrintTable(tMsg)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -308,18 +326,12 @@ end
 -- Announce data to other clients
 function RareTimer:Announce(data)
     --todo: sort?
-    for _, val in pairs(data) do
-        local t = {}
-        t.name = GameLib.GetPlayerUnit():GetName()
-        t.message = "Name State Timestamp RareTimerVersion"
-        self.chanICC:SendMessage(t)
-    end
-end
-
--- Parse announcements from other clients
-function RareTimer:OnRareTimerChannelMessage(channel, tMsg)
-    self:CPrint("Msg Received on " .. channel)
-    self.PrintTable(tMsg)
+    --for _, val in pairs(data) do
+        --local t = {}
+        --t.name = GameLib.GetPlayerUnit():GetName()
+        --t.message = "Name State Timestamp RareTimerVersion"
+        --self.chanICC:SendMessage(t)
+    --end
 end
 
 -- Calculate % mob health
@@ -370,7 +382,10 @@ end
 function RareTimer:CmdList(input)
     self:CPrint(L["CmdListHeading"])
     for _, mob in pairs(self:GetEntries()) do
-        self:CPrint(self:GetStatusStr(mob))
+        local statusStr = self:GetStatusStr(mob)
+        if statusStr ~= nil then
+            self:CPrint(statusStr)
+        end
     end
 end
 
@@ -438,6 +453,10 @@ end
 
 -- Print the contents of a table to the Command channel
 function RareTimer:PrintTable(table, depth)
+    if table == nil then
+        Print("Nil table")
+        return
+    end
     if depth == nil then
         depth = 0
     end
@@ -632,6 +651,21 @@ end
 -- Send contents of DB to other clients (if needed)
 function RareTimer:BroadcastDB()
     --todo
+end
+
+-- Send data to other clients
+function RareTimer:SendData(msg)
+    if type(msg) ~= 'table' then
+        msg = {strMsg = msg}
+    end
+    self.channel:SendMessage(msg)
+end
+
+function RareTimer:SendTestData(msg)
+    if type(msg) ~= 'table' then
+        msg = {strMsg = msg}
+    end
+    self:OnRareTimerChannelMessage(self.channel, msg, "TestMsg")
 end
 
 -- Convert server time to local time
