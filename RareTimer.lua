@@ -15,6 +15,7 @@ require "ICCommLib"
 local RareTimer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("RareTimer", false) -- Configure = false
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("RareTimer", true) -- Silent = true
 local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
 
 -----------------------------------------------------------------------------------------------
 -- Constants
@@ -108,6 +109,9 @@ function RareTimer:OnEnable()
     if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
         -- Slash commands
         Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
+        self.opt = Optparse:OptionParser{usage="%prog [options]", command="raretimer"}
+        SendVarToRover("Self opt", self.opt)
+        self:AddOptions()
 
         -- Event handlers
         Apollo.RegisterEventHandler("CombatLogDamage", "OnCombatLogDamage", self)
@@ -140,37 +144,47 @@ end
 -- on SlashCommand "/raretimer"
 function RareTimer:OnRareTimerOn(sCmd, sInput)
     local s = string.lower(sInput)
-    if s ~= nil and s ~= '' and s ~= 'help' then
-        if s == "list" then
+    local options, args = self.opt.parse_args(s)
+    SendVarToRover("Options", options)
+    SendVarToRover("Args", args)
+    if options ~= nil then
+        if options.list then
             self:CmdList(s)
-        elseif s:find("spam ") == 1 then
+        elseif options.say then
             self:CmdSpam(s)
-        elseif s == "debug" then
+        elseif options.debug then
             self:PrintTable(self:GetEntries())
-        elseif s == "debugconfig" then
+        elseif options.debugconfig then
             self:PrintTable(self.db.profile.config)
-        elseif s == "update" then
+        elseif options.update then
             self:OnTimer()
-        elseif s == "show" then
+        elseif options.show then
             self.wndMain:Show(true)
-        elseif s == "hide" then
+        elseif options.hide then
             self.wndMain:Show(false)
-        elseif s == "toggle" then
+        elseif options.toggle then
             self.wndMain:Toggle()
-        elseif s == "reset" then
+        elseif options.reset then
             self.db:ResetProfile()
-        elseif s == "test" then
+        elseif options.test then
             self:SendTestData('Foo!')
             self:SendTestData({msg='Bar', other='baz'})
         end
-    else
-        self:ShowHelp(s)
     end
-    --Print(inspect(self.db))
-    --for a,b in pairs(L) do
-        --Print("A: " .. a .. " B: " .. b)
-    --end
-    --Print("RareTimer!")
+end
+
+function RareTimer:AddOptions()
+    self.opt.add_option{'-l', '--list', action='store_true', dest='list', help='List mobs'}
+    self.opt.add_option{'-S', '--say', action='store', dest='say', help='Say mob status'}
+    self.opt.add_option{'-c', '--channel', action='store', dest='channel', help='Channel to use for --say', default="p"}
+    self.opt.add_option{'-d', '--debug', action='store_true', dest='debug', help='debug mobs'}
+    self.opt.add_option{'-D', '--debugconfig', action='store_true', dest='debugconfig', help='debug config'}
+    self.opt.add_option{'-u', '--update', action='store_true', dest='update', help='Update states'}
+    self.opt.add_option{'-s', '--show', action='store_true', dest='show', help='Show window'}
+    self.opt.add_option{'-h', '--hide', action='store_true', dest='hide', help='Hide window'}
+    self.opt.add_option{'-t', '--toggle', action='store_true', dest='toggle', help='Toggle window'}
+    self.opt.add_option{'-r', '--reset', action='store_true', dest='reset', help='Reset all settings/stored data'}
+    self.opt.add_option{'-T', '--test', action='store_true', dest='test', help='Test command'}
 end
 
 function RareTimer:ShowHelp(input)

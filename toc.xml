@@ -3,6 +3,7 @@
 	<Script Name="libs/GeminiAddon/GeminiAddon.lua"/>
 	<Script Name="libs/GeminiLocale/GeminiLocale.lua"/>
 	<Script Name="libs/GeminiDB/GeminiDB-1.0.lua"/>
+	<Script Name="libs/lua-pythonic-optparse/optparse.lua"/>
 
 	<Script Name="locale/enUS.lua"/>
 	<Script Name="locale/deDE.lua"/>
