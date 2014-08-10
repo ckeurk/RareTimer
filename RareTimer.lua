@@ -10,18 +10,11 @@ require "GameLib"
 require "ICCommLib"
  
 -----------------------------------------------------------------------------------------------
--- RareTimer Module Definition
------------------------------------------------------------------------------------------------
-local RareTimer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("RareTimer", false) -- Configure = false
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("RareTimer", true) -- Silent = true
-local GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
-local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
-
------------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local version = 0.01
- 
+local MAJOR, MINOR = "RareTimer-0.1", 0
+
+-- Data sources
 local Source = {
     Target = 0,
     Kill = 1,
@@ -32,6 +25,7 @@ local Source = {
     Timer = 6,
 }
 
+-- Mob entry states
 local States = {
     Unknown = 0, -- Unseen, unreported
     Killed = 1, -- Player saw kill
@@ -42,6 +36,30 @@ local States = {
     Expired = 6, -- Been longer than MaxSpawn since last known kill
 }
 
+-- Header for broadcast messages
+local MsgHeader = {
+    MsgVersion = 1, -- Increment when format of broadcast data changes
+    Required = 1, -- Set to MsgVersion when format changes and breaks backwards compatibility
+    RTVersion = {Major = MAJOR, Minor = MINOR},
+}
+ 
+-- Broadcast message types
+local MsgTypes = {
+    Update = 0,
+    Sync = 1,
+    New = 2,
+}
+
+-----------------------------------------------------------------------------------------------
+-- RareTimer Module Definition
+-----------------------------------------------------------------------------------------------
+local RareTimer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(MAJOR, false) -- Configure = false
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("RareTimer", true) -- Silent = true
+local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
+
+-----------------------------------------------------------------------------------------------
+-- Config/DB init
+-----------------------------------------------------------------------------------------------
 local defaults = {
     profile = {
         config = {
@@ -88,6 +106,7 @@ local defaults = {
         }
     }
 }
+
 -----------------------------------------------------------------------------------------------
 -- RareTimer OnInitialize
 -----------------------------------------------------------------------------------------------
@@ -144,7 +163,7 @@ end
 -- on SlashCommand "/raretimer"
 function RareTimer:OnRareTimerOn(sCmd, sInput)
     local s = string.lower(sInput)
-    local options, args = self.opt.parse_args(s)
+    local options, args = self.opt.parse_args(sInput)
     SendVarToRover("Options", options)
     SendVarToRover("Args", args)
     if options ~= nil then
@@ -167,8 +186,7 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
         elseif options.reset then
             self.db:ResetProfile()
         elseif options.test then
-            self:SendTestData('Foo!')
-            self:SendTestData({msg='Bar', other='baz'})
+            self:BroadcastDB(true)
         end
     end
 end
@@ -269,6 +287,7 @@ function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
     tMsg.strSender = strSender
     SendVarToRover('Msg', tMsg)
     self:PrintTable(tMsg)
+    self:ReceiveData(tMsg)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -663,23 +682,103 @@ function RareTimer:DurToStr(dur)
 end
 
 -- Send contents of DB to other clients (if needed)
-function RareTimer:BroadcastDB()
+function RareTimer:BroadcastDB(test)
+    if test == nil then
+        test = false
+    end
+
+    for _, entry in pairs(self:GetEntries()) do
+        if self:ShouldBroadcast(entry) then
+            if test then
+                self:SendState(entry, nil, test)
+            else
+                self:SendState(entry)
+            end
+        end
+    end
+end
+
+-- Check if we should broadcast the entry or not
+function RareTimer:ShouldBroadcast(entry)
     --todo
+    return true
+end
+
+-- Format & broadcast an entry
+function RareTimer:SendState(entry, msgtype, test)
+    if test == nil then
+        test = false
+    end
+
+    if msgtype == nil then
+        msgtype = MsgTypes.Sync
+    end
+
+    local msg = {
+        Type = msgtype,
+        Name = entry.Name,
+        State = entry.State,
+        Killed = entry.Killed,
+        Timestamp = entry.Timestamp,
+        Source = entry.Source,
+    }
+
+    if test then
+        self:SendTestData(msg)
+    else
+        self:SendData(msg)
+    end
 end
 
 -- Send data to other clients
-function RareTimer:SendData(msg)
+function RareTimer:SendData(msg, test)
+    if test == nil then
+        test = false
+    end
     if type(msg) ~= 'table' then
         msg = {strMsg = msg}
     end
-    self.channel:SendMessage(msg)
+    msg.Timestamp = GameLib.GetServerTime()
+    msg.Header = MsgHeader
+
+    if test then
+        self:OnRareTimerChannelMessage(self.channel, msg, "TestMsg")
+    else
+        self.channel:SendMessage(msg)
+    end
 end
 
+-- "Send" data to this client
 function RareTimer:SendTestData(msg)
-    if type(msg) ~= 'table' then
-        msg = {strMsg = msg}
+    self:SendData(msg, true)
+end
+
+-- Parse data from other clients
+function RareTimer:ReceiveData(msg)
+    --todo
+    if msg.Header ~= nil and msg.Header.Required > MsgHeader.MsgVersion then
+        self:OutOfDate()
+        return
+    elseif msg.Header ~= nil and msg.Header.RTVersion.Minor < MINOR then
+        self:UpdateAvailable()
     end
-    self:OnRareTimerChannelMessage(self.channel, msg, "TestMsg")
+    --Parse msg
+end
+
+-- Inform user that a new version is available but not backwards compatible
+function RareTimer:OutOfDate()
+    if self.Outdated == nil then
+        self:CPrint("RareTimer is out of date and will no longer receive updates from other clients")
+        self.Outdated = true
+    end
+end
+
+-- Inform user that a newer version is available to download
+function RareTimer:UpdateAvailable()
+    if self.Updatable == nil then
+        self:CPrint("A new version of RareTimer is available.")
+        self.Updatable = true
+    end
 end
 
 -- Convert server time to local time
@@ -696,7 +795,13 @@ end
 
 -- Get the list of mob entries
 function RareTimer:GetEntries()
-    return self.db.realm.mobs
+    local entries = {}
+    for _, entry in pairs(self.db.realm.mobs) do
+        if entry.Name ~= nil and entry.Name ~= '' then
+            table.insert(entries, entry)
+        end
+    end
+    return entries
 end
 
 -----------------------------------------------------------------------------------------------
@@ -716,8 +821,6 @@ end
 -- Junk !
 -----------------------------------------------------------------------------------------------
 
-  --local disposition = unit:GetDispositionTo(GameLib.GetPlayerUnit())
-
 --  if unit:IsValid() and not unit:IsDead() and not unit:IsACharacter() and 
 --     (table.find(unitName, self.rareNames) or table.find(unitName, self.customNames)) then
 --    local item = self.rareMobs[unit:GetName()]
@@ -732,23 +835,3 @@ end
 --      end
 --    end
 --  end
---
-    --Yellowtail Fury: id 5380606, Elite 0, ClassId 23, Archetype[idArchetype] = 20 (Tank)
-    --Perfect Stag: id: 4403258, Elite 0, ClassId 23, Archetype = 10 (MeleeDPS)
-    --Sproutlings: nil name, nil archetype
-    --Galactium Node: Archetype 29
-    --Scorchwing: Elite 2, archetype 17 (Vehicle)
-
-    --Rares table:
-    --Name
-    --Dead
-    --Timestamp
-    --Expires
-
-    --Time table: { nDay, nDayOfWeek, nHour, nMonth, nSecond, nYear, strFormattedTime }
-
-            --local strKilled = string.format("%s %s %s", name, strVerb, localTime.strFormattedTime)
-            --
-            --Trigger events: Rare mob alive, rare mob dead
-    --todo: Barbtail goes unknown too quickly after alive
-    --todo: Use DurToStr to add next spawn to list
