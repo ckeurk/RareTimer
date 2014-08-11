@@ -6,7 +6,8 @@ if not L then return end
 L["LocaleName"] = Locale
 
 --Command strings
-L["CmdListHeading"] = "RareTimer status list:" 
+L["CmdListHeading"] = "RareTimer registre d'état:" 
+L["AlertHeading"] = "RareTimer alerte:"
 
 --Time strings
 L["s"] = "s" -- Seconds

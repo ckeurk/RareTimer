@@ -6,6 +6,7 @@ L["LocaleName"] = Locale
 
 --Command strings
 L["CmdListHeading"] = "RareTimer status list:"
+L["AlertHeading"] = "RareTimer alert:"
 
 --Time strings
 L["s"] = true -- Seconds

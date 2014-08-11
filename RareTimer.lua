@@ -194,6 +194,7 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
         elseif options.toggle then
             self.wndMain:Toggle()
         elseif options.reset then
+            self:CPrint("Resetting RareTimer db")
             self.db:ResetProfile()
         elseif options.test then
             --self:BroadcastDB(true)
@@ -337,14 +338,25 @@ end
 function RareTimer:SawAlive(unit)
     local entry = self:GetEntry(unit:GetName())
     local health = self:GetUnitHealth(unit)
-    local strState
+    local alert = false
+
     if health ~= nil and entry ~= nil then
         if health == 100 then
+            if entry.State ~= States.Alive then
+                alert = true
+            end
             self:SetState(entry, States.Alive, Source.Combat)
         else
+            if entry.State ~= States.InCombat then
+                alert = true
+            end
             self:SetState(entry, States.InCombat, Source.Combat)
         end
         self:SetHealth(entry, health)
+    end
+
+    if alert then
+        self:Alert(entry)
     end
 end
 
@@ -805,13 +817,21 @@ function RareTimer:ReceiveData(msg)
 
     local entry = self:GetEntry(name)
     local now = GameLib.GetServerTime()
+    local alert = false
     if self:IsNewer(msg.Timestamp, entry.Timestamp) then
+        if entry.State ~= msg.State and (msg.State == States.Alive or msg.State == States.InCombat or msg.State == States.Killed) then
+            alert = true
+        end
         entry.State = msg.State
         entry.Health = msg.Health
         entry.Killed = msg.Killed
         entry.Timestamp = msg.Timestamp
         entry.Source = Source.Report
         entry.LastReport = now
+    end
+
+    if alert then
+        self:Alert(entry)
     end
 end
 
@@ -872,6 +892,10 @@ function RareTimer:DeLocale(str)
     end
 end
 
+function RareTimer:Alert(entry)
+    self:CPrint(string.format("%s %s", L["AlertHeading"], self:GetStatusStr(entry)))
+end
+
 -----------------------------------------------------------------------------------------------
 -- RareTimerForm Functions
 -----------------------------------------------------------------------------------------------
@@ -885,21 +909,8 @@ function RareTimer:OnCancel()
     self.wndMain:Show(false) -- hide the window
 end
 
------------------------------------------------------------------------------------------------
--- Junk !
------------------------------------------------------------------------------------------------
-
---  if unit:IsValid() and not unit:IsDead() and not unit:IsACharacter() and 
---     (table.find(unitName, self.rareNames) or table.find(unitName, self.customNames)) then
---    local item = self.rareMobs[unit:GetName()]
---    if not item then
---      if self.broadcastToParty and GroupLib.InGroup() then
---        -- no quick way to party chat, need to find the channel first
---        for _,channel in pairs(ChatSystemLib.GetChannels()) do
---          if channel:GetType() == ChatSystemLib.ChatChannel_Party then
---            channel:Send("Rare detected: " .. unit:GetName())
---          end
---        end
---      end
---    end
---  end
+--todo:
+--
+--Events
+--GUI
+--History
