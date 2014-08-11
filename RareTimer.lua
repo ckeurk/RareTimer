@@ -72,8 +72,8 @@ local defaults = {
             ReportTimeout = 120, -- 2m
             Track = {
                 L["Scorchwing"],
-                L["Honeysting Barbtail"],
-                L["Scorchwing Scorchling"],
+                --L["Honeysting Barbtail"],
+                --L["Scorchwing Scorchling"],
             }
         },
     },
@@ -98,6 +98,7 @@ local defaults = {
                 MinSpawn = 3600, --60m
                 MaxSpawn = 6600, --110m
             },
+            --[[
             {    
                 Name = L["Honeysting Barbtail"],
                 MinSpawn = 120, --2m
@@ -108,6 +109,7 @@ local defaults = {
                 MinSpawn = 120, --2m
                 MaxSpawn = 600, --10m
             },
+            --]]
         }
     }
 }
@@ -197,6 +199,7 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
         elseif options.reset then
             self:CPrint("Resetting RareTimer db")
             self.db:ResetProfile()
+            self.db:ResetDB()
         elseif options.test then
             --self:BroadcastDB(true)
             local entry = self:GetEntry(L["Scorchwing Scorchling"])
