@@ -14,6 +14,8 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 local MAJOR, MINOR = "RareTimer-0.1", 0
 
+local DEBUG = false -- Debug mode
+
 -- Data sources
 local Source = {
     Target = 0,
@@ -23,6 +25,7 @@ local Source = {
     Combat = 4,
     Report = 5,
     Timer = 6,
+    Corpse = 7,
 }
 
 -- Mob entry states
@@ -65,6 +68,7 @@ local defaults = {
         config = {
             Slack = 600, --10m, MaxSpawn + Slack = Expired
             CombatTimeout = 300, -- 5m
+            ReportTimeout = 120, -- 2m
             Track = {
                 L["Scorchwing"],
                 L["Honeysting Barbtail"],
@@ -129,7 +133,9 @@ function RareTimer:OnEnable()
         -- Slash commands
         Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
         self.opt = Optparse:OptionParser{usage="%prog [options]", command="raretimer"}
-        SendVarToRover("Self opt", self.opt)
+        if DEBUG then
+            SendVarToRover("Self opt", self.opt)
+        end
         self:AddOptions()
 
         -- Event handlers
@@ -145,7 +151,9 @@ function RareTimer:OnEnable()
 
         -- Timers
         self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
-        SendVarToRover("Mobs", self.db.realm.mobs)
+        if DEBUG then
+            SendVarToRover("Mobs", self.db.realm.mobs)
+        end
 
         -- Config
         self.db.profile.config.TZOffset = self:GetTZOffset()
@@ -164,8 +172,10 @@ end
 function RareTimer:OnRareTimerOn(sCmd, sInput)
     local s = string.lower(sInput)
     local options, args = self.opt.parse_args(sInput)
-    SendVarToRover("Options", options)
-    SendVarToRover("Args", args)
+    if DEBUG then
+        SendVarToRover("Options", options)
+        SendVarToRover("Args", args)
+    end
     if options ~= nil then
         if options.list then
             self:CmdList(s)
@@ -186,7 +196,16 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
         elseif options.reset then
             self.db:ResetProfile()
         elseif options.test then
-            self:BroadcastDB(true)
+            --self:BroadcastDB(true)
+            local entry = self:GetEntry(L["Scorchwing Scorchling"])
+            local now = GameLib.GetServerTime()
+            if entry.State == States.Alive then
+                entry.State = States.Dead
+            else
+                entry.State = States.Alive
+            end
+            entry.Timestamp = now
+            self:SendState(entry, nil, true)
         end
     end
 end
@@ -203,17 +222,6 @@ function RareTimer:AddOptions()
     self.opt.add_option{'-t', '--toggle', action='store_true', dest='toggle', help='Toggle window'}
     self.opt.add_option{'-r', '--reset', action='store_true', dest='reset', help='Reset all settings/stored data'}
     self.opt.add_option{'-T', '--test', action='store_true', dest='test', help='Test command'}
-end
-
-function RareTimer:ShowHelp(input)
-    if input == nil or input == '' then
-        self:CPrint("RareTimer commands:")
-        self:CPrint("help <command>: Show help")
-        self:CPrint("list: List the status of all mobs")
-        self:CPrint("spam <channel> <name>: Broadcast the spawn time")
-    else
-        self:CPrint("Not yet implemented")
-    end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -271,21 +279,16 @@ end
 
 -- Trigger housekeeping/announcements
 function RareTimer:OnTimer()
-    --Print("Timer triggered")
     self:UpdateState()
     self:BroadcastDB()
-
-    --self.unitPlayerDisposition = GameLib.GetPlayerUnit()
-    --if self.unitPlayerDisposition == nil or not self.unitPlayerDisposition:IsValid() or RegisteredUsers == nil then
-        --self.tQueuedUnits = {}
-        --return
-    --end    
 end
 
 -- Parse announcements from other clients
 function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
     tMsg.strSender = strSender
-    SendVarToRover('Msg', tMsg)
+    if DEBUG then
+        SendVarToRover('Msg', tMsg)
+    end
     self:PrintTable(tMsg)
     self:ReceiveData(tMsg)
 end
@@ -311,64 +314,42 @@ end
 
 -- Record a kill
 function RareTimer:SawKilled(unit)
-    local time = GameLib.GetServerTime()
-    local localtime = GameLib.GetLocalTime()
+    local now = GameLib.GetServerTime()
     local entry = self:GetEntry(unit:GetName())
     if entry ~= nil then
-        entry.State = States.Killed
-        entry.Killed = time
-        entry.Timestamp = time
+        self:SetState(entry, States.Killed, Source.Kill)
+        self:SetKilled(entry)
         self:UpdateDue(entry)
-        --local strKilled = string.format(L["StateKilled"], localtime.strFormattedTime)
-        --Print(string.format("%s %s", unit:GetName(), strKilled))
     end
 end
 
 -- Record a corpse
 function RareTimer:SawDead(unit)
-    local time = GameLib.GetServerTime()
     local entry = self:GetEntry(unit:GetName())
     if entry ~= nil and entry.State ~= States.Killed then
-        entry.State = States.Dead
-        entry.Killed = time
-        entry.Timestamp = time
+        self:SetState(entry, States.Dead, Source.Corpse)
+        self:SetKilled(entry)
         self:UpdateDue(entry)
     end
 end
 
 -- Record a live mob
 function RareTimer:SawAlive(unit)
-    local time = GameLib.GetServerTime()
     local entry = self:GetEntry(unit:GetName())
-    local health = self:GetHealth(unit)
+    local health = self:GetUnitHealth(unit)
     local strState
     if health ~= nil and entry ~= nil then
         if health == 100 then
-            entry.State = States.Alive
-            strState = L["StateAlive"]
+            self:SetState(entry, States.Alive, Source.Combat)
         else
-            entry.State = States.InCombat
-            strState = L["StateInCombat"]
+            self:SetState(entry, States.InCombat, Source.Combat)
         end
-        entry.Timestamp = time
-        --local strAlive = string.format(strState, time.strFormattedTime)
-        --Print(string.format("%s %s", unit:GetName(), strAlive))
+        self:SetHealth(entry, health)
     end
 end
 
--- Announce data to other clients
-function RareTimer:Announce(data)
-    --todo: sort?
-    --for _, val in pairs(data) do
-        --local t = {}
-        --t.name = GameLib.GetPlayerUnit():GetName()
-        --t.message = "Name State Timestamp RareTimerVersion"
-        --self.chanICC:SendMessage(t)
-    --end
-end
-
 -- Calculate % mob health
-function RareTimer:GetHealth(unit)
+function RareTimer:GetUnitHealth(unit)
     if unit ~= nil then
         local health = unit:GetHealth()
         local maxhealth = unit:GetMaxHealth()
@@ -478,7 +459,7 @@ end
 -- Print to the Command channel
 function RareTimer:CPrint(msg)
     if msg == nil then
-        msg = ''
+        return
     end
 
     ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Command, msg, "")
@@ -519,14 +500,14 @@ function RareTimer:UpdateState()
     for _, mob in pairs(self:GetEntries()) do
         -- Expire entries
         if mob.State ~= States.Unknown and mob.State ~= States.Expired and self:IsExpired(mob) then
-            self:SetState(mob, States.Expired)
+            self:SetState(mob, States.Expired, Source.Timer)
             return
         elseif mob.State == States.InCombat and self:IsCombatExpired(mob) then
-            self:SetState(mob, States.Expired)
+            self:SetState(mob, States.Expired, Source.Timer)
             return
         -- Set pending spawn
         elseif self:IsDue(mob) then
-            self:SetState(mob, States.Pending)
+            self:SetState(mob, States.Pending, Source.Timer)
             return
         end
     end
@@ -585,10 +566,27 @@ function RareTimer:GetAge(timestamp)
 end
 
 -- Set the entry's state
-function RareTimer:SetState(entry, state)
+function RareTimer:SetState(entry, state, source)
     local now = GameLib.GetServerTime()
     entry.State = state
     entry.Timestamp = now
+    entry.Source = source
+    if (state ~= States.Alive and state ~= States.InCombat) then
+        self:SetHealth(entry, nil)
+    end
+end
+
+-- Set the entry's last kill time
+function RareTimer:SetKilled(entry, time)
+    if time == nil then
+        time = GameLib.GetServerTime()
+    end
+    entry.Killed = time
+end
+
+-- Set the entry's health
+function RareTimer:SetHealth(entry, health)
+    entry.Health = health
 end
 
 -- Set the estimated spawn window
@@ -648,6 +646,11 @@ function RareTimer:DiffTime(wsT2, wsT1)
     return os.difftime(t2, t1)
 end
 
+-- Is time T2 newer than time T1?
+function RareTimer:IsNewer(wsT2, wsT1)
+    return self:DiffTime(wsT2, wsT1) > 0
+end
+
 -- Convert a duration in seconds to a shortform string
 function RareTimer:DurToStr(dur)
     local min = 0
@@ -687,6 +690,8 @@ function RareTimer:BroadcastDB(test)
         test = false
     end
 
+    local now = GameLib.GetServerTime()
+    self.db.realm.LastBroadcast = now
     for _, entry in pairs(self:GetEntries()) do
         if self:ShouldBroadcast(entry) then
             if test then
@@ -700,8 +705,12 @@ end
 
 -- Check if we should broadcast the entry or not
 function RareTimer:ShouldBroadcast(entry)
-    --todo
-    return true
+    local now = GameLib.GetServerTime()
+    if entry.LastReport == nil or self:DiffTime(now, entry.LastReport) > self.db.profile.config.ReportTimeout then
+        return true
+    else
+        return false
+    end
 end
 
 -- Format & broadcast an entry
@@ -716,8 +725,9 @@ function RareTimer:SendState(entry, msgtype, test)
 
     local msg = {
         Type = msgtype,
-        Name = entry.Name,
+        Name = self:DeLocale(entry.Name), -- Use english so we can communicate with other locales
         State = entry.State,
+        Health = entry.Health,
         Killed = entry.Killed,
         Timestamp = entry.Timestamp,
         Source = entry.Source,
@@ -735,12 +745,22 @@ function RareTimer:SendData(msg, test)
     if test == nil then
         test = false
     end
+
+    -- If we're given a string, encapsulate it in a table
     if type(msg) ~= 'table' then
         msg = {strMsg = msg}
     end
-    msg.Timestamp = GameLib.GetServerTime()
-    msg.Header = MsgHeader
 
+    -- Set header fields
+    msg.Header = MsgHeader
+    msg.Header.Timestamp = GameLib.GetServerTime()
+    msg.Header.Locale = L["LocaleName"]
+
+    if DEBUG then
+        --self:CPrint(string.format("Sending data for %s", msg.Name))
+    end
+
+    -- If a test message, don't actually broadcast
     if test then
         self:OnRareTimerChannelMessage(self.channel, msg, "TestMsg")
     else
@@ -748,21 +768,60 @@ function RareTimer:SendData(msg, test)
     end
 end
 
--- "Send" data to this client
+-- "Send" data to ourself
 function RareTimer:SendTestData(msg)
     self:SendData(msg, true)
 end
 
 -- Parse data from other clients
 function RareTimer:ReceiveData(msg)
-    --todo
+    if DEBUG then
+        SendVarToRover("Received Data", msg)
+    end
+
+    if not self:ValidData(msg) then
+        if DEBUG then
+            self:CPrint("Invalid data received.")
+            self:PrintTable(msg)
+        end
+        return
+    end
+
     if msg.Header ~= nil and msg.Header.Required > MsgHeader.MsgVersion then
         self:OutOfDate()
         return
     elseif msg.Header ~= nil and msg.Header.RTVersion.Minor < MINOR then
         self:UpdateAvailable()
     end
+
     --Parse msg
+    local name = L[msg.Name]
+    if not self:IsNotable(name) then
+        if DEBUG then
+            self:CPrint(string.format("Received unexpected name: %s (Raw: %s)", name, msg.Name))
+        end
+        return
+    end
+
+    local entry = self:GetEntry(name)
+    local now = GameLib.GetServerTime()
+    if self:IsNewer(msg.Timestamp, entry.Timestamp) then
+        entry.State = msg.State
+        entry.Health = msg.Health
+        entry.Killed = msg.Killed
+        entry.Timestamp = msg.Timestamp
+        entry.Source = Source.Report
+        entry.LastReport = now
+    end
+end
+
+-- Verify format of msg
+function RareTimer:ValidData(msg)
+    if msg.Header ~= nil and msg.Name ~= nil and msg.Timestamp ~= nil then
+        return true
+    else
+        return false
+    end
 end
 
 -- Inform user that a new version is available but not backwards compatible
@@ -802,6 +861,15 @@ function RareTimer:GetEntries()
         end
     end
     return entries
+end
+
+-- De-localize a string
+function RareTimer:DeLocale(str)
+    for key, value in pairs(L) do
+        if str == value then
+            return key
+        end
+    end
 end
 
 -----------------------------------------------------------------------------------------------

@@ -1,4 +1,8 @@
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RareTimer", "enUS", true)
+local Locale = "enUS"
+local IsDefaultLocale = true
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RareTimer", Locale, IsDefaultLocale)
+
+L["LocaleName"] = Locale
 
 --Command strings
 L["CmdListHeading"] = "RareTimer status list:"
