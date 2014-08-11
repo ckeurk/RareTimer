@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 1
+local MAJOR, MINOR = "RareTimer-0.1", 2
 
 local DEBUG = false -- Debug mode
 
@@ -293,7 +293,7 @@ function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
     tMsg.strSender = strSender
     if DEBUG then
         SendVarToRover('Msg', tMsg)
-        self:PrintTable(tMsg)
+        --self:PrintTable(tMsg)
     end
     self:ReceiveData(tMsg)
 end
@@ -815,7 +815,7 @@ function RareTimer:ReceiveData(msg)
     if msg.Header ~= nil and msg.Header.Required > MsgHeader.MsgVersion then
         self:OutOfDate()
         return
-    elseif msg.Header ~= nil and msg.Header.RTVersion.Minor < MINOR then
+    elseif msg.Header ~= nil and msg.Header.RTVersion.Minor > MINOR then
         self:UpdateAvailable()
     end
 
