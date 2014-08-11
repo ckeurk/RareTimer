@@ -66,6 +66,7 @@ local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
 local defaults = {
     profile = {
         config = {
+            PlaySound = true,
             Slack = 600, --10m, MaxSpawn + Slack = Expired
             CombatTimeout = 300, -- 5m
             ReportTimeout = 120, -- 2m
@@ -893,6 +894,9 @@ function RareTimer:DeLocale(str)
 end
 
 function RareTimer:Alert(entry)
+    if self.db.profile.config.PlaySound then
+        Sound.Play(Sound.PlayUIExplorerSignalDetection4)  
+    end
     self:CPrint(string.format("%s %s", L["AlertHeading"], self:GetStatusStr(entry)))
 end
 
