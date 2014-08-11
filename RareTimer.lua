@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 0
+local MAJOR, MINOR = "RareTimer-0.1", 1
 
 local DEBUG = false -- Debug mode
 
@@ -293,8 +293,8 @@ function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
     tMsg.strSender = strSender
     if DEBUG then
         SendVarToRover('Msg', tMsg)
+        self:PrintTable(tMsg)
     end
-    self:PrintTable(tMsg)
     self:ReceiveData(tMsg)
 end
 
@@ -628,6 +628,9 @@ end
 
 -- Convert Wildstar time to lua time
 function RareTimer:ToLuaTime(wsTime)
+    if wsTime == nil then
+        return
+    end
     local convert = {
         year = wsTime.nYear,
         month = wsTime.nMonth,
@@ -656,6 +659,9 @@ end
 
 -- Measure difference between two times (in seconds)
 function RareTimer:DiffTime(wsT2, wsT1)
+    if wsT2 == nil or wsT1 == nil then
+        return
+    end
     local t1 = self:ToLuaTime(wsT1)
     local t2 = self:ToLuaTime(wsT2)
 
@@ -664,6 +670,9 @@ end
 
 -- Is time T2 newer than time T1?
 function RareTimer:IsNewer(wsT2, wsT1)
+    if wsT2 == nil or wsT1 == nil then
+        return true
+    end
     return self:DiffTime(wsT2, wsT1) > 0
 end
 
