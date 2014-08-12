@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 2
+local MAJOR, MINOR = "RareTimer-0.1", 3
 
 local DEBUG = false -- Debug mode
 
@@ -79,7 +79,6 @@ local defaults = {
     },
     realm = {
         LastBroadcast = nil,
-        TZOffset = 0, -- Localtime offset from servertime
         mobs = {
             ['**'] = {
                 --Name
@@ -158,9 +157,6 @@ function RareTimer:OnEnable()
             SendVarToRover("Mobs", self.db.realm.mobs)
         end
 
-        -- Config
-        self.db.profile.config.TZOffset = self:GetTZOffset()
-        
         -- Window
         self.wndMain = Apollo.LoadForm(self.xmlDoc, "RareTimerForm", nil, self)
         self.wndMain:Show(false)
@@ -202,14 +198,15 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self.db:ResetDB()
         elseif options.test then
             --self:BroadcastDB(true)
-            local entry = self:GetEntry(L["Scorchwing Scorchling"])
             local now = GameLib.GetServerTime()
-            if entry.State == States.Alive then
-                entry.State = States.Dead
-            else
-                entry.State = States.Alive
-            end
-            entry.Timestamp = now
+            local entry = {    
+                State = States.Unknown,
+                Name = "Scorchwing Scorchling",
+                MinSpawn = 120, --2m
+                MaxSpawn = 600, --10m
+                Timestamp = now,
+            }
+
             self:SendState(entry, nil, true)
         end
     end
@@ -438,7 +435,7 @@ function RareTimer:GetStatusStr(entry)
         when = entry.Killed
     elseif entry.State == States.Pending then
         strState = L["StatePending"]
-        when = entry.Due
+        when = entry.MinDue
     elseif entry.State == States.Alive then
         strState = L["StateAlive"]
         when = entry.Timestamp
@@ -585,7 +582,9 @@ end
 function RareTimer:SetState(entry, state, source)
     local now = GameLib.GetServerTime()
     entry.State = state
-    entry.Timestamp = now
+    if entry.State ~= state then
+        entry.Timestamp = now
+    end
     entry.Source = source
     if (state ~= States.Alive and state ~= States.InCombat) then
         self:SetHealth(entry, nil)
@@ -659,9 +658,6 @@ end
 
 -- Measure difference between two times (in seconds)
 function RareTimer:DiffTime(wsT2, wsT1)
-    if wsT2 == nil or wsT1 == nil then
-        return
-    end
     local t1 = self:ToLuaTime(wsT1)
     local t2 = self:ToLuaTime(wsT2)
 
@@ -731,7 +727,7 @@ end
 -- Check if we should broadcast the entry or not
 function RareTimer:ShouldBroadcast(entry)
     local now = GameLib.GetServerTime()
-    if entry.LastReport == nil or self:DiffTime(now, entry.LastReport) > self.db.profile.config.ReportTimeout then
+    if entry.Timestamp ~= nil and (entry.LastReport == nil or self:DiffTime(now, entry.LastReport) > self.db.profile.config.ReportTimeout) then
         return true
     else
         return false
@@ -828,6 +824,10 @@ function RareTimer:ReceiveData(msg)
         return
     end
 
+    if msg.strSender == "TestMsg" then
+        return
+    end
+
     local entry = self:GetEntry(name)
     local now = GameLib.GetServerTime()
     local alert = false
@@ -876,7 +876,7 @@ end
 -- Convert server time to local time
 function RareTimer:LocalTime(date)
     local serverTime = self:ToLuaTime(date)
-    local localTime = serverTime + self.db.realm.TZOffset
+    local localTime = serverTime + self:GetTZOffset()
     return self:ToWsTime(localTime)
 end
 
