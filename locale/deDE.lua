@@ -21,7 +21,7 @@ L["StateKilled"] = 'Killed at %s'
 L["StateDead"] = 'Killed at or before %s'
 L["StatePending"] = 'Due to spawn before %s'
 L["StateAlive"] = 'Alive (as of %s)'
-L["StateInCombat"] = 'In combat'
+L["StateInCombat"] = 'In combat (%d%%)'
 L["StateExpired"] = 'Unknown (last seen %s)'
 
 -- Mob names

@@ -427,7 +427,9 @@ function RareTimer:GetStatusStr(entry)
     end
 
     local when
+    local value = -1
     local strState = 'ERROR'
+    local strStatus = 'ERROR'
     if entry.State == States.Unknown then
         strState = L["StateUnknown"]
         when = entry.Timestamp
@@ -445,17 +447,18 @@ function RareTimer:GetStatusStr(entry)
         when = entry.Timestamp
     elseif entry.State == States.InCombat then
         strState = L["StateInCombat"]
-        when = entry.Timestamp
+        value = entry.Health
     elseif entry.State == States.Expired then
         strState = L["StateExpired"]
         when = entry.Timestamp
     end
-    if when == nil then
-        when = GameLib.GetServerTime()
-        when.nYear = 1970
+
+    if when ~= nil then
+        strStatus = string.format(strState, self:FormatDate(self:LocalTime(when)))
+    else
+        strStatus = string.format(strState, value)
     end
-    local strWhen = self:FormatDate(self:LocalTime(when))
-    local strStatus = string.format(strState, strWhen)
+        
     return string.format("%s: %s", entry.Name, strStatus)
 end
 
