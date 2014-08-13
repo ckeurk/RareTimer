@@ -68,8 +68,9 @@ local defaults = {
         config = {
             PlaySound = true,
             Slack = 600, --10m, MaxSpawn + Slack = Expired
-            CombatTimeout = 300, -- 5m
-            ReportTimeout = 120, -- 2m
+            CombatTimeout = 300, -- 5m, leave combat state after no updates within this time
+            ReportTimeout = 120, -- 2m, don't send basic sync broadcasts if we saw a report within this time
+            LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
             Track = {
                 L["Scorchwing"],
                 --L["Honeysting Barbtail"],
@@ -91,6 +92,7 @@ local defaults = {
                 --MaxDue
                 --Expires
                 --LastReport
+                --LastTarget
             },
             {    
                 Name = L["Scorchwing"],
@@ -302,22 +304,26 @@ end
 -- Update the status of a rare mob
 function RareTimer:UpdateEntry(unit, source)
     if self:IsMob(unit) and self:IsNotable(unit:GetName()) then
+        local entry = self:GetEntry(unit:GetName())
+        if source == Source.Target then
+            local now = GameLib.GetServerTime()
+            entry.LastTarget = now
+        end
         if unit:IsDead() then
             if source == Source.Kill then
-                self:SawKilled(unit)
+                self:SawKilled(entry, source)
             else
-                self:SawDead(unit)
+                self:SawDead(entry, source)
             end
         else
-            self:SawAlive(unit)
+            self:SawAlive(entry, source)
         end
     end
 end
 
 -- Record a kill
-function RareTimer:SawKilled(unit)
+function RareTimer:SawKilled(entry, source)
     local now = GameLib.GetServerTime()
-    local entry = self:GetEntry(unit:GetName())
     if entry ~= nil then
         self:SetState(entry, States.Killed, Source.Kill)
         self:SetKilled(entry)
@@ -326,8 +332,7 @@ function RareTimer:SawKilled(unit)
 end
 
 -- Record a corpse
-function RareTimer:SawDead(unit)
-    local entry = self:GetEntry(unit:GetName())
+function RareTimer:SawDead(entry, source)
     if entry ~= nil and entry.State ~= States.Killed then
         self:SetState(entry, States.Dead, Source.Corpse)
         self:SetKilled(entry)
@@ -336,8 +341,7 @@ function RareTimer:SawDead(unit)
 end
 
 -- Record a live mob
-function RareTimer:SawAlive(unit)
-    local entry = self:GetEntry(unit:GetName())
+function RareTimer:SawAlive(entry, source)
     local health = self:GetUnitHealth(unit)
     local alert = false
 
@@ -906,10 +910,13 @@ function RareTimer:DeLocale(str)
 end
 
 function RareTimer:Alert(entry)
-    if self.db.profile.config.PlaySound then
-        Sound.Play(Sound.PlayUIExplorerSignalDetection4)  
+    local age = self:GetAge(entry.LastTarget)
+    if age == nil or age < self.db.profile.config.LastTargetTimeout then
+        if self.db.profile.config.PlaySound then
+            Sound.Play(Sound.PlayUIExplorerSignalDetection4)  
+        end
+        self:CPrint(string.format("%s %s", L["AlertHeading"], self:GetStatusStr(entry)))
     end
-    self:CPrint(string.format("%s %s", L["AlertHeading"], self:GetStatusStr(entry)))
 end
 
 -----------------------------------------------------------------------------------------------
