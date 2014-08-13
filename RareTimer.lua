@@ -865,7 +865,7 @@ end
 
 -- Verify format of msg
 function RareTimer:ValidData(msg)
-    if msg.Header ~= nil and msg.Data.Name ~= nil and msg.Data.Timestamp ~= nil then
+    if msg.Header ~= nil and msg.Data ~= nil and msg.Data.Name ~= nil and msg.Data.Timestamp ~= nil then
         return true
     else
         return false
