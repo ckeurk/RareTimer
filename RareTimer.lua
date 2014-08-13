@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 3
+local MAJOR, MINOR = "RareTimer-0.1", 4
 
 local DEBUG = false -- Debug mode
 
@@ -41,8 +41,8 @@ local States = {
 
 -- Header for broadcast messages
 local MsgHeader = {
-    MsgVersion = 1, -- Increment when format of broadcast data changes
-    Required = 1, -- Set to MsgVersion when format changes and breaks backwards compatibility
+    MsgVersion = 2, -- Increment when format of broadcast data changes
+    Required = 2, -- Set to MsgVersion when format changes and breaks backwards compatibility
     RTVersion = {Major = MAJOR, Minor = MINOR},
 }
  
@@ -289,7 +289,11 @@ end
 
 -- Parse announcements from other clients
 function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
-    tMsg.strSender = strSender
+    if tMsg.Header ~= nil then
+        tMsg.Header.strSender = strSender
+    else
+        tMsg.Header = {strSender = strSender}
+    end
     if DEBUG then
         SendVarToRover('Msg', tMsg)
         --self:PrintTable(tMsg)
@@ -769,14 +773,17 @@ function RareTimer:SendState(entry, msgtype, test)
 end
 
 -- Send data to other clients
-function RareTimer:SendData(msg, test)
+function RareTimer:SendData(data, test)
     if test == nil then
         test = false
     end
 
+    local msg = {}
     -- If we're given a string, encapsulate it in a table
-    if type(msg) ~= 'table' then
-        msg = {strMsg = msg}
+    if type(data) ~= 'table' then
+        msg.Data = {strMsg = msg}
+    else
+        msg.Data = data
     end
 
     -- Set header fields
@@ -823,29 +830,30 @@ function RareTimer:ReceiveData(msg)
     end
 
     --Parse msg
-    local name = L[msg.Name]
+    local data = msg.Data
+    local name = L[data.Name]
     if not self:IsNotable(name) then
         if DEBUG then
-            self:CPrint(string.format("Received unexpected name: %s (Raw: %s)", name, msg.Name))
+            self:CPrint(string.format("Received unexpected name: %s (Raw: %s)", name, data.Name))
         end
         return
     end
 
-    if msg.strSender == "TestMsg" then
+    if msg.Header.strSender == "TestMsg" then
         return
     end
 
     local entry = self:GetEntry(name)
     local now = GameLib.GetServerTime()
     local alert = false
-    if self:IsNewer(msg.Timestamp, entry.Timestamp) then
-        if entry.State ~= msg.State and (msg.State == States.Alive or msg.State == States.InCombat or msg.State == States.Killed) then
+    if self:IsNewer(data.Timestamp, entry.Timestamp) then
+        if entry.State ~= data.State and (data.State == States.Alive or data.State == States.InCombat or data.State == States.Killed) then
             alert = true
         end
-        entry.State = msg.State
-        entry.Health = msg.Health
-        entry.Killed = msg.Killed
-        entry.Timestamp = msg.Timestamp
+        entry.State = data.State
+        entry.Health = data.Health
+        entry.Killed = data.Killed
+        entry.Timestamp = data.Timestamp
         entry.Source = Source.Report
         entry.LastReport = now
     end
@@ -857,7 +865,7 @@ end
 
 -- Verify format of msg
 function RareTimer:ValidData(msg)
-    if msg.Header ~= nil and msg.Name ~= nil and msg.Timestamp ~= nil then
+    if msg.Header ~= nil and msg.Data.Name ~= nil and msg.Data.Timestamp ~= nil then
         return true
     else
         return false
@@ -914,7 +922,7 @@ end
 
 function RareTimer:Alert(entry)
     local age = self:GetAge(entry.LastTarget)
-    if age == nil or age < self.db.profile.config.LastTargetTimeout then
+    if age == nil or age > self.db.profile.config.LastTargetTimeout then
         if self.db.profile.config.PlaySound then
             Sound.Play(Sound.PlayUIExplorerSignalDetection4)  
         end
