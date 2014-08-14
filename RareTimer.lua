@@ -811,19 +811,22 @@ function RareTimer:ReceiveData(msg)
         SendVarToRover("Received Data", msg)
     end
 
+    if msg.Header ~= nil then
+        if msg.Header.Required > MsgHeader.MsgVersion then
+            self:OutOfDate()
+            return
+        end
+        if msg.Header ~= nil and msg.Header.RTVersion.Minor > MINOR then
+            self:UpdateAvailable()
+        end
+    end
+
     if not self:ValidData(msg) then
         if DEBUG then
             self:CPrint("Invalid data received.")
             self:PrintTable(msg)
         end
         return
-    end
-
-    if msg.Header ~= nil and msg.Header.Required > MsgHeader.MsgVersion then
-        self:OutOfDate()
-        return
-    elseif msg.Header ~= nil and msg.Header.RTVersion.Minor > MINOR then
-        self:UpdateAvailable()
     end
 
     --Parse msg
