@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 4
+local MAJOR, MINOR = "RareTimer-0.1", 5
 
 local DEBUG = false -- Debug mode
 
@@ -233,8 +233,8 @@ end
 -----------------------------------------------------------------------------------------------
 
 -- Capture mobs as they're targeted
-function RareTimer:OnTargetUnitChanged(targetID)
-    self:UpdateEntry(targetID, Source.Target)
+function RareTimer:OnTargetUnitChanged(unit)
+    self:UpdateEntry(unit, Source.Target)
 end
 
 -- Capture mobs as they're killed/damaged
@@ -320,6 +320,7 @@ function RareTimer:UpdateEntry(unit, source)
                 self:SawDead(entry, source)
             end
         else
+            self:SetHealth(entry, self:GetUnitHealth(unit))
             self:SawAlive(entry, source)
         end
     end
@@ -327,7 +328,6 @@ end
 
 -- Record a kill
 function RareTimer:SawKilled(entry, source)
-    local now = GameLib.GetServerTime()
     if entry ~= nil then
         self:SetState(entry, States.Killed, Source.Kill)
         self:SetKilled(entry)
@@ -346,11 +346,9 @@ end
 
 -- Record a live mob
 function RareTimer:SawAlive(entry, source)
-    local health = self:GetUnitHealth(unit)
     local alert = false
-
-    if health ~= nil and entry ~= nil then
-        if health == 100 then
+    if entry.Health ~= nil and entry ~= nil then
+        if entry.Health == 100 then
             if entry.State ~= States.Alive then
                 alert = true
             end
@@ -361,7 +359,6 @@ function RareTimer:SawAlive(entry, source)
             end
             self:SetState(entry, States.InCombat, Source.Combat)
         end
-        self:SetHealth(entry, health)
     end
 
     if alert then
@@ -546,7 +543,7 @@ function RareTimer:IsDue(entry)
 
     -- Move the due time up if we only saw the corpse, not the kill
     local due = entry.MinSpawn
-    if State == States.Dead then
+    if entry.State == States.Dead then
         due = due - self.db.profile.config.Slack
     end
 
@@ -592,8 +589,8 @@ end
 -- Set the entry's state
 function RareTimer:SetState(entry, state, source)
     local now = GameLib.GetServerTime()
-    entry.State = state
     if entry.State ~= state then
+        entry.State = state
         entry.Timestamp = now
     end
     entry.Source = source
