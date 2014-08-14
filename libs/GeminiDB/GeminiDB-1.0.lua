@@ -32,7 +32,7 @@
 -- end
 -- @class file
 -- @name GeminiDB-1.0.lua
-local MAJOR, MINOR = "Gemini:DB-1.0", 1
+local MAJOR, MINOR = "Gemini:DB-1.0", 5
 local APkg = Apollo.GetPackage(MAJOR)
 if APkg and (APkg.nVersion or 0) >= MINOR then
 	return -- no upgrade is needed
@@ -43,7 +43,11 @@ local GeminiDB = APkg and APkg.tPackage or {}
 local type, pairs, next, error, tinsert, tremove = type, pairs, next, error, table.insert, table.remove
 local setmetatable, getmetatable, rawset, rawget = setmetatable, getmetatable, rawset, rawget
 
+-- Wildstar APIs
+local Apollo, GameLib = Apollo, GameLib
+
 -- Global vars/functions that we don't upvalue since they might get hooked, or upgraded
+--GLOBALS:
 
 local CallbackHandler, AddonLog
 local CallbackDummy = { Fire = function() end }
@@ -223,6 +227,13 @@ local dbmt = {
 			local keys = rawget(t, "keys")
 			local key = keys[section]
 			if key then
+				if type(key) == "function" then
+					if not keys[section](keys) then
+						error("Attempt to access character-specific field " .. section .. " before character loaded.")
+					end
+					-- the key has changed so we need to obtain it again.
+					key = keys[section]	
+				end
 				local defaultTbl = rawget(t, "defaults")
 				local defaults = defaultTbl and defaultTbl[section]
 
@@ -270,38 +281,46 @@ local preserve_keys = {
 	["children"] = true,
 }
 
-local tRace2Faction = {
-	
-}
-
 local realmKey = GameLib.GetRealmName()
 local charKey = GameLib.GetAccountRealmCharacter().strCharacter .. " - " .. realmKey
 local localeKey = GetLocale():lower()
 
+local function populateKeys(self)
+	local uPlayer = GameLib.GetPlayerUnit()
+	if not uPlayer then
+		-- No changes
+		return false
+	end
+	self["class"] = "Class - " .. uPlayer:GetClassId()
+	self["race"] = "Race - " .. uPlayer:GetRaceId()
+
+	-- Changes made
+	return true
+end
+
 -- Actual database initialization function
-local function initdb(oAddon, defaults, defaultProfile, olddb, parent)
-	local tNewDB = {}
+local function initdb(sv, defaults, defaultProfile, olddb, parent)
 	-- Generate the database keys for each section
 
 	-- map "true" to our "Default" profile
 	if defaultProfile == true then defaultProfile = "Default" end
-	
+
 	local profileKey
 	if not parent then
 		-- Make a container for profile keys
-		if not tNewDB.profileKeys then tNewDB.profileKeys = {} end
+		if not sv.profileKeys then sv.profileKeys = {} end
 
 		-- Try to get the profile selected from the char db
-		profileKey = tNewDB.profileKeys[charKey] or defaultProfile or charKey
+		profileKey = sv.profileKeys[charKey] or defaultProfile or charKey
 
 		-- save the selected profile for later
-		tNewDB.profileKeys[charKey] = profileKey
+		sv.profileKeys[charKey] = profileKey
 	else
 		-- Use the profile of the parents DB
 		profileKey = parent.keys.profile or defaultProfile or charKey
 
 		-- clear the profileKeys in the DB, namespaces don't need to store them
-		tNewDB.profileKeys = nil
+		sv.profileKeys = nil
 	end
 
 	-- This table contains keys that enable the dynamic creation
@@ -314,6 +333,8 @@ local function initdb(oAddon, defaults, defaultProfile, olddb, parent)
 		["locale"] = localeKey,
 		["global"] = true,
 		["profiles"] = true,
+		["class"] = populateKeys,
+		["race"] = populateKeys,
 	}
 
 	validateDefaults(defaults, keyTbl, 1)
@@ -330,7 +351,7 @@ local function initdb(oAddon, defaults, defaultProfile, olddb, parent)
 	if not rawget(db, "callbacks") then
 		-- try to load CallbackHandler-1.0 if it loaded after our library
 		if not CallbackHandler then
-			local APkg = Apollo.GetPackage("Gemini:CallbackHandler-1.0", true)
+			local APkg = Apollo.GetPackage("Gemini:CallbackHandler-1.0")
 			CallbackHandler = APkg and APkg.tPackage or nil
 		end
 		db.callbacks = CallbackHandler and CallbackHandler:New(db) or CallbackDummy
@@ -347,15 +368,24 @@ local function initdb(oAddon, defaults, defaultProfile, olddb, parent)
 		-- hack this one in
 		db.RegisterDefaults = DBObjectLib.RegisterDefaults
 		db.ResetProfile = DBObjectLib.ResetProfile
+		db.ResetSection = DBObjectLib.ResetSection
 	end
 
 	-- Set some properties in the database object
-	db.profiles = tNewDB.profiles
+	db.profiles = sv.profiles
 	db.keys = keyTbl
-	db.sv = tNewDB
-	--db.tNewDB_name = name
+	db.sv = sv
 	db.defaults = defaults
+	db.defaultProfile = defaultProfile
 	db.parent = parent
+
+	return db
+end
+
+local function createdb(oAddon, defaults, defaultProfile)
+	local tNewDB = {}
+
+	local db = initdb(tNewDB, defaults, defaultProfile)
 
 	-- store the DB in the registry
 	GeminiDB.db_registry[oAddon] = db
@@ -363,16 +393,7 @@ local function initdb(oAddon, defaults, defaultProfile, olddb, parent)
 	return db
 end
 
--- strip all defaults from the database
--- and cleans up empty sections
-local function OnSave(self, eLevel)
-	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account then
-		return nil
-	end
-
-	local db = GeminiDB.db_registry[self]
-	if not db then return nil end
-
+local function shutdowndb(db)
 	db.callbacks:Fire("OnDatabaseShutdown", db)
 	db:RegisterDefaults(nil)
 
@@ -394,17 +415,67 @@ local function OnSave(self, eLevel)
 			end
 		end
 	end
-	-- Return the data to save out
-	return sv
 end
 
-local function OnRestore(self, eLevel, tSavedData)
+-- strip all defaults from the database
+-- and cleans up empty sections
+local function OnSave(self, eLevel)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account then
-		return
+		return nil
 	end
 
 	local db = GeminiDB.db_registry[self]
+	if not db then return nil end
+
+	shutdowndb(db)
+
+	if db.children then
+		for namespace, namespaceDB in pairs(db.children) do
+			shutdowndb(namespaceDB)
+		end
+	end
+
+	-- Return the data to save out
+	return rawget(db, "sv")
+end
+
+local function OnRestore(self, eLevel, tSavedData)
+	local db = GeminiDB.db_registry[self]
+	local tCancelDefaultProcessing = { bCancelDefault = false }
+	db.callbacks:Fire("OnDatabaseImport", db, eLevel, tSavedData, tCancelDefaultProcessing)
+
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Account or
+			tCancelDefaultProcessing.bCancelDefault then
+		return
+	end
+
 	copyTable(tSavedData, db.sv)
+
+	local sv = rawget(db, "sv")
+	-- Try to get the profile selected from the char db
+	local profileKey = sv.profileKeys[charKey] or db.defaultProfile or charKey
+	-- save the selected profile for later
+	sv.profileKeys[charKey] = profileKey
+
+	-- Set profile to the correct profile
+	local keyTbl = rawget(db, "keys")
+	keyTbl.profile = profileKey
+
+	-- If there are namespace DBs then select the correct profile now too.
+	if db.children then
+		for namespace, namespaceDB in pairs(db.children) do
+			local sv = rawget(namespaceDB, "sv")
+			-- Try to get the profile selected from the char db
+			local profileKey = sv.profileKeys[charKey] or db.defaultProfile or charKey
+			-- save the selected profile for later
+			sv.profileKeys[charKey] = profileKey
+
+			-- Set profile to the correct profile
+			local keyTbl = rawget(namespaceDB, "keys")
+			keyTbl.profile = profileKey
+		end
+	end
+
 	db.callbacks:Fire("OnDatabaseStartup", db)
 end
 
@@ -626,6 +697,42 @@ function DBObjectLib:ResetProfile(noChildren, noCallbacks)
 	end
 end
 
+--- Resets the current profile to the default values (if specified).
+-- @param name The name of the database section to reset
+-- @param noChildren if set to true, the reset will not be populated to the child namespaces of this DB object
+-- @param noCallbacks if set to true, won't fire the On Type Reset callback
+function DBObjectLib:ResetSection(name, noChildren, noCallbacks)
+	if not name then
+		error(("Usage: GeminiDBObject:ResetSection(name, noChildren, noCallbacks): 'name' - string required."))
+	end
+	local keyTbl = rawget(self, "keys")
+	if not keyTbl[name] or name == "profiles" then
+		error(("Usage: GeminiDBObject:ResetSection(name, noChildren, noCallbacks): '%s' is not a valid section."):format(type))
+	end
+	local section = self[name]
+
+	for k,v in pairs(section) do
+		section[k] = nil
+	end
+
+	local defaults = self.defaults and self.defaults[name]
+	if defaults then
+		copyDefaults(section, defaults)
+	end
+
+	-- populate to child namespaces
+	if self.children and not noChildren then
+		for _, db in pairs(self.children) do
+			DBObjectLib.ResetSection(db, name, nil, noCallbacks)
+		end
+	end
+
+	-- Callback: OnSectionReset, database, sectionName
+	if not noCallbacks then
+		self.callbacks:Fire("OnSectionReset", self, name)
+	end
+end
+
 --- Resets the entire database, using the string defaultProfile as the new default
 -- profile.
 -- @param defaultProfile The profile name to use as the default
@@ -744,7 +851,7 @@ function GeminiDB:New(oAddon, defaults, defaultProfile)
 	oAddon.OnSave = OnSave
 	oAddon.OnRestore = OnRestore
 
-	return initdb(oAddon, defaults, defaultProfile)
+	return createdb(oAddon, defaults, defaultProfile)
 end
 
 Apollo.RegisterPackage(GeminiDB, MAJOR, MINOR, {})
