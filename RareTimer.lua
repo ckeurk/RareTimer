@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 5
+local MAJOR, MINOR = "RareTimer-0.1", 6
 
 local DEBUG = false -- Debug mode
 
@@ -203,13 +203,15 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             local now = GameLib.GetServerTime()
             local entry = {    
                 State = States.Unknown,
-                Name = "Scorchwing Scorchling",
+                Name = "Testy McTestMob",
                 MinSpawn = 120, --2m
                 MaxSpawn = 600, --10m
                 Timestamp = now,
             }
 
             self:SendState(entry, nil, true)
+        else
+            self.opt.print_help()
         end
     end
 end
@@ -222,7 +224,7 @@ function RareTimer:AddOptions()
     self.opt.add_option{'-D', '--debugconfig', action='store_true', dest='debugconfig', help='debug config'}
     self.opt.add_option{'-u', '--update', action='store_true', dest='update', help='Update states'}
     self.opt.add_option{'-s', '--show', action='store_true', dest='show', help='Show window'}
-    self.opt.add_option{'-h', '--hide', action='store_true', dest='hide', help='Hide window'}
+    self.opt.add_option{'-H', '--hide', action='store_true', dest='hide', help='Hide window'}
     self.opt.add_option{'-t', '--toggle', action='store_true', dest='toggle', help='Toggle window'}
     self.opt.add_option{'-r', '--reset', action='store_true', dest='reset', help='Reset all settings/stored data'}
     self.opt.add_option{'-T', '--test', action='store_true', dest='test', help='Test command'}

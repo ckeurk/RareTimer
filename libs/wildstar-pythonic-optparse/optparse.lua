@@ -105,7 +105,7 @@ function Lib:OptionParser(t)
 
   function o.tokenize(str)
     if str == nil or #str == 0 then
-      return
+      return {}
     end
 
     local i, i1, i2 = 1, 1, 1
