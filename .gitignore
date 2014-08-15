@@ -64,3 +64,5 @@ getdate.c
 MANIFEST
 dist/
 build/
+
+examples/
