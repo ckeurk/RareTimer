@@ -16,6 +16,8 @@ local MAJOR, MINOR = "RareTimer-0.1", 6
 
 local DEBUG = false -- Debug mode
 
+kStringOk = 3
+
 -- Data sources
 local Source = {
     Target = 0,
@@ -57,6 +59,7 @@ local MsgTypes = {
 -- RareTimer Module Definition
 -----------------------------------------------------------------------------------------------
 local RareTimer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(MAJOR, false) -- Configure = false
+local GeminiGUI = Apollo.GetPackage("Gemini:GUI-1.0").tPackage
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("RareTimer", true) -- Silent = true
 local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
 
@@ -121,10 +124,6 @@ local defaults = {
 function RareTimer:OnInitialize()
     self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-    -- load our form file
-    self.xmlDoc = XmlDoc.CreateFromFile("RareTimer.xml")
-    self.xmlDoc:RegisterCallback("OnDocLoaded", self)
-    
     -- Init
     self.IsLoading = false
 end
@@ -133,36 +132,34 @@ end
 -- RareTimer OnEnable
 -----------------------------------------------------------------------------------------------
 function RareTimer:OnEnable()
-    if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
-        -- Slash commands
-        Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
-        self.opt = Optparse:OptionParser{usage="%prog [options]", command="raretimer"}
-        if DEBUG then
-            SendVarToRover("Self opt", self.opt)
-        end
-        self:AddOptions()
-
-        -- Event handlers
-        Apollo.RegisterEventHandler("CombatLogDamage", "OnCombatLogDamage", self)
-        Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", self)
-        Apollo.RegisterEventHandler("TargetUnitChanged", "OnTargetUnitChanged", self)
-        Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
-        Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
-        Apollo.RegisterEventHandler("ChangeWorld", "OnChangeWorld", self)
-
-        -- Status update channel
-        self.channel = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
-
-        -- Timers
-        self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
-        if DEBUG then
-            SendVarToRover("Mobs", self.db.realm.mobs)
-        end
-
-        -- Window
-        self.wndMain = Apollo.LoadForm(self.xmlDoc, "RareTimerForm", nil, self)
-        self.wndMain:Show(false)
+    -- Slash commands
+    Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
+    self.opt = Optparse:OptionParser{usage="%prog [options]", command="raretimer"}
+    if DEBUG then
+        SendVarToRover("Self opt", self.opt)
     end
+    self:AddOptions()
+
+    -- Event handlers
+    Apollo.RegisterEventHandler("CombatLogDamage", "OnCombatLogDamage", self)
+    Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", self)
+    Apollo.RegisterEventHandler("TargetUnitChanged", "OnTargetUnitChanged", self)
+    Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
+    Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
+    Apollo.RegisterEventHandler("ChangeWorld", "OnChangeWorld", self)
+
+    -- Status update channel
+    self.channel = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
+
+    -- Timers
+    self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
+    if DEBUG then
+        SendVarToRover("Mobs", self.db.realm.mobs)
+    end
+
+    -- Window
+    self.wndMain = self:InitMainWindow()
+    self.wndMain:Show(false)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -200,7 +197,7 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self.db:ResetProfile()
             self.db:ResetDB()
         elseif options.test then
-            --self:BroadcastDB(true)
+            --[[
             local now = GameLib.GetServerTime()
             local entry = {    
                 State = States.Unknown,
@@ -211,6 +208,8 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             }
 
             self:SendState(entry, nil, true)
+            --]]
+            self:InitMainWindow()
         else
             self.opt.print_help()
         end
@@ -417,7 +416,7 @@ end
 function RareTimer:CmdList(input)
     self:CPrint(L["CmdListHeading"])
     for _, mob in pairs(self:GetEntries()) do
-        local statusStr = self:GetStatusStr(mob)
+        local statusStr = string.format("%s: %s", mob.Name, self:GetStatusStr(mob))
         if statusStr ~= nil then
             self:CPrint(statusStr)
         end
@@ -431,9 +430,7 @@ function RareTimer:GetStatusStr(entry)
     end
 
     local when
-    local value = -1
     local strState = 'ERROR'
-    local strStatus = 'ERROR'
     if entry.State == States.Unknown then
         strState = L["StateUnknown"]
         when = entry.Timestamp
@@ -445,25 +442,19 @@ function RareTimer:GetStatusStr(entry)
         when = entry.Killed
     elseif entry.State == States.Pending then
         strState = L["StatePending"]
-        when = entry.MinDue
+        when = entry.MaxDue
     elseif entry.State == States.Alive then
         strState = L["StateAlive"]
         when = entry.Timestamp
     elseif entry.State == States.InCombat then
         strState = L["StateInCombat"]
-        value = entry.Health
+        when = entry.Timestamp
     elseif entry.State == States.Expired then
         strState = L["StateExpired"]
         when = entry.Timestamp
     end
 
-    if when ~= nil then
-        strStatus = string.format(strState, self:FormatDate(self:LocalTime(when)))
-    else
-        strStatus = string.format(strState, value)
-    end
-        
-    return string.format("%s: %s", entry.Name, strStatus)
+    return string.format(strState, self:FormatDate(self:LocalTime(when)))
 end
 
 -- Convert a date to a string in the format YYYY-MM-DD hh:mm:ss pp
@@ -685,6 +676,10 @@ end
 
 -- Convert a duration in seconds to a shortform string
 function RareTimer:DurToStr(dur)
+    if dur == nil then
+        return
+    end
+
     local min = 0
     local hour = 0
     local day = 0
@@ -923,13 +918,109 @@ function RareTimer:DeLocale(str)
     end
 end
 
+--Send an alert
 function RareTimer:Alert(entry)
     local age = self:GetAge(entry.LastTarget)
     if age == nil or age > self.db.profile.config.LastTargetTimeout then
         if self.db.profile.config.PlaySound then
             Sound.Play(Sound.PlayUIExplorerSignalDetection4)  
         end
-        self:CPrint(string.format("%s %s", L["AlertHeading"], self:GetStatusStr(entry)))
+        self:CPrint(string.format("%s %s: %s", L["AlertHeading"], entry.Name, self:GetStatusStr(entry)))
+    end
+end
+
+--Init main window
+function RareTimer:InitMainWindow()
+    local tWndDefinition = {
+        Name          = "RareTimerMainWindow",
+        Template      = "CRB_TooltipSimple",
+        UseTemplateBG = true,
+        Picture       = true,
+        Moveable      = true,
+        Border        = true,
+        Visible       = false,
+        AnchorCenter  = {600, 260},
+        Escapable     = true,
+        
+        Pixies = {
+            {
+                Text          = "RareTimer",
+                Font          = "CRB_HeaderHuge",
+                TextColor     = "xkcdYellow",
+                AnchorPoints  = "HFILL",
+                DT_CENTER     = true,
+                DT_VCENTER    = true,
+                AnchorOffsets = {0,0,0,20},
+            },
+        },
+
+        Children = {
+            { -- Close button
+                Name          = "CloseButton",
+                WidgetType    = "PushButton",
+                AnchorPoints  = "TOPRIGHT",
+                AnchorOffsets = { -17, -3, 3, 17 },
+                Base          = "CRB_Basekit:kitBtn_Holo_Close",
+                NoClip        = true,
+                Events = { ButtonSignal = function(_, wndHandler, wndControl) wndControl:GetParent():Close() end, },
+            },
+            { -- Grid container
+                Name          = "GridContainer", 
+                AnchorCenter = {560, 200},
+                Children = {
+                    { -- Grid
+                        Name         = "StatusGrid",
+                        WidgetType   = "Grid",
+                        AnchorCenter = {560, 160},
+                        Columns      = {
+                            { Name = L["Name"], Width = 150 },
+                            { Name = L["Status"], Width = 250 },
+                            { Name = L["Last kill"], Width = 100 },
+                            { Name = L["Health"], Width = 60 },
+                        },
+                        Events = { WindowLoad = RareTimer.PopulateGrid },
+                    },
+                },
+            },
+            { -- Ok button
+                WidgetType = "PushButton",
+                Text = Apollo.GetString(kStringOk),
+                NoClip        = true,
+                AnchorPoints = "BOTTOMRIGHT",
+                AnchorOffsets = {-120,-40,-20,-10},
+                Events = { ButtonSignal = function(_, wndHandler, wndControl) wndControl:GetParent():Close() end, },
+            },
+        }
+    }
+
+    local tWnd = GeminiGUI:Create(tWndDefinition)
+    return tWnd:GetInstance()
+end
+
+--Populate grid with list of mobs
+function RareTimer:PopulateGrid(wndHandler, wndControl)
+    local RT = RareTimer
+    local tGridData = {}
+    local row
+    local name, state, killed, health, age
+    local entries = RT:GetEntries()
+    for i=1, #entries do
+        name = entries[i].Name
+        state = RT:GetStatusStr(entries[i])
+        age = RT:GetAge(entries[i].Killed)
+        killed = RT:DurToStr(age)
+        health = "--"
+        if entries[i].Health ~= nil then
+            health = string.format("%d%%", entries[i].Health)
+        end
+        tGridData[i] = {name, state, killed, health}
+    end
+
+    for idx, tRow in ipairs(tGridData) do
+        local iCurrRow =  wndControl:AddRow("")
+        for cIdx, strCol in ipairs(tRow) do
+            wndControl:SetCellText(iCurrRow, cIdx, strCol)
+        end
     end
 end
 

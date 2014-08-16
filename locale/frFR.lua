@@ -5,9 +5,13 @@ if not L then return end
 
 L["LocaleName"] = Locale
 
---Command strings
+--Heading strings
 L["CmdListHeading"] = "RareTimer registre d'état:" 
 L["AlertHeading"] = "RareTimer alerte:"
+L["Name"] = "Nom"
+L["Status"] = "Condition"
+L["Last kill"] = "Tué"
+L["Health"] = "Vie"
 
 --Time strings
 L["s"] = "s" -- Seconds
