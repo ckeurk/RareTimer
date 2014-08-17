@@ -148,6 +148,8 @@ function RareTimer:OnEnable()
     Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
     Apollo.RegisterEventHandler("ChangeWorld", "OnChangeWorld", self)
     Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
+    Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
+    Apollo.RegisterEventHandler("ToggleRareTimer", "OnToggleRareTimer", self)
 
     -- Status update channel
     self.channel = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
@@ -184,8 +186,6 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self:PrintTable(self:GetEntries())
         elseif options.debugconfig then
             self:PrintTable(self.db.profile.config)
-        elseif options.update then
-            self:OnTimer()
         elseif options.show then
             self.wndMain:Show(true)
         elseif options.hide then
@@ -209,8 +209,6 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
 
             self:SendState(entry, nil, true)
             --]]
-            Print(inspect(getmetatable(self.wndMain)))
-            Print(self.wndMain:IsVisible())
         else
             self.opt.print_help()
         end
@@ -223,7 +221,6 @@ function RareTimer:AddOptions()
     self.opt.add_option{'-c', '--channel', action='store', dest='channel', help='Channel to use for --say', default="p"}
     self.opt.add_option{'-d', '--debug', action='store_true', dest='debug', help='debug mobs'}
     self.opt.add_option{'-D', '--debugconfig', action='store_true', dest='debugconfig', help='debug config'}
-    self.opt.add_option{'-u', '--update', action='store_true', dest='update', help='Update states'}
     self.opt.add_option{'-s', '--show', action='store_true', dest='show', help='Show window'}
     self.opt.add_option{'-H', '--hide', action='store_true', dest='hide', help='Hide window'}
     self.opt.add_option{'-t', '--toggle', action='store_true', dest='toggle', help='Toggle window'}
@@ -309,6 +306,16 @@ function RareTimer:OnWindowManagementReady()
     Event_FireGenericEvent("WindowManagementAdd", { wnd = self.wndMain, strName = "RareTimer" })
 end
 
+-- Add us to the interface menu
+function RareTimer:OnInterfaceMenuListHasLoaded()
+	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "RareTimer", 
+		{"ToggleRareTimer", "", "CRB_Basekit:kitIcon_Holo_Clock"})
+end
+
+-- Toggle the window when clicked in the interface menu
+function RareTimer:OnToggleRareTimer()
+    self.wndMain:Show(not self.wndMain:IsVisible())
+end
 -----------------------------------------------------------------------------------------------
 -- RareTimer Functions
 -----------------------------------------------------------------------------------------------
