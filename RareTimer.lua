@@ -933,24 +933,25 @@ end
 function RareTimer:InitMainWindow()
     local tWndDefinition = {
         Name          = "RareTimerMainWindow",
-        Template      = "CRB_TooltipSimple",
-        UseTemplateBG = true,
+        --Template      = "CRB_TooltipSimple",
+        Sprite        = "BK3:UI_BK3_Holo_InsetFramed_Darker",
+        --UseTemplateBG = true,
         Picture       = true,
         Moveable      = true,
         Border        = true,
         Visible       = false,
-        AnchorCenter  = {600, 260},
+        AnchorCenter  = {600, 280},
         Escapable     = true,
         
         Pixies = {
             {
                 Text          = "RareTimer",
                 Font          = "CRB_HeaderHuge",
-                TextColor     = "xkcdYellow",
+                TextColor     = "UI_BtnTextBlueNormal",
                 AnchorPoints  = "HFILL",
                 DT_CENTER     = true,
                 DT_VCENTER    = true,
-                AnchorOffsets = {0,0,0,20},
+                AnchorOffsets = {0,10,0,30},
             },
         },
 
@@ -959,19 +960,20 @@ function RareTimer:InitMainWindow()
                 Name          = "CloseButton",
                 WidgetType    = "PushButton",
                 AnchorPoints  = "TOPRIGHT",
-                AnchorOffsets = { -17, -3, 3, 17 },
-                Base          = "CRB_Basekit:kitBtn_Holo_Close",
+                AnchorOffsets = { -21, 1, -1, 21 },
+                Base          = "BK3:btnHolo_Clear",
                 NoClip        = true,
                 Events = { ButtonSignal = function(_, wndHandler, wndControl) wndControl:GetParent():Close() end, },
             },
             { -- Grid container
                 Name          = "GridContainer", 
-                AnchorCenter = {560, 200},
+                AnchorPoints = "CENTER",
+                AnchorOffsets = { -280, -100, 280, 85 },
                 Children = {
                     { -- Grid
                         Name         = "StatusGrid",
                         WidgetType   = "Grid",
-                        AnchorCenter = {560, 160},
+                        AnchorFill   = true,
                         Columns      = {
                             { Name = L["Name"], Width = 150 },
                             { Name = L["Status"], Width = 250 },
@@ -987,7 +989,7 @@ function RareTimer:InitMainWindow()
                 Text = Apollo.GetString(kStringOk),
                 NoClip        = true,
                 AnchorPoints = "BOTTOMRIGHT",
-                AnchorOffsets = {-120,-40,-20,-10},
+                AnchorOffsets = {-120,-45,-20,-15},
                 Events = { ButtonSignal = function(_, wndHandler, wndControl) wndControl:GetParent():Close() end, },
             },
         }
