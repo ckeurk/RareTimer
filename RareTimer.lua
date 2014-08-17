@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 8
+local MAJOR, MINOR = "RareTimer-0.1", 9
 
 local DEBUG = false -- Debug mode
 
@@ -1045,7 +1045,10 @@ function RareTimer:InitMainWindow()
                             { Name = L["Last kill"], Width = 100 },
                             { Name = L["Health"], Width = 60 },
                         },
-                        Events = { WindowLoad = RareTimer.PopulateGrid },
+                        Events = { 
+                            WindowLoad = RareTimer.PopulateGrid,
+                            WindowShow = RareTimer.PopulateGrid,
+                        },
                     },
                 },
             },
