@@ -1,0 +1,23 @@
+package-as: RareTimer-@project-version@
+enable-nolib-creation: no
+
+externals:
+  libs/GeminiAddon:
+    url: https://github.com/wildstarnasa/GeminiAddon.git
+  libs/GeminiConfig:
+    url: https://github.com/Kowh/GeminiConfig.git
+  libs/GeminiDB:
+    url: https://github.com/wildstarnasa/GeminiDB.git
+  libs/GeminiGUI:
+    url: https://github.com/wildstarnasa/GeminiGUI.git
+  libs/GeminiLocale:
+    url: https://github.com/wildstarnasa/GeminiLocale.git
+  libs/wildstar-pythonic-optparse:
+    url: https://github.com/Kowh/Wildstar-pythonic-optparse.git
+
+manual-changelog: CHANGELOG.txt
+
+license-output: LICENSE.txt
+
+ignore:
+  - libs/*
