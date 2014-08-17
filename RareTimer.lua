@@ -190,8 +190,7 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
         elseif options.hide then
             self.wndMain:Show(false)
         elseif options.toggle then
-            self:CPrint("Not yet implemented")
-            --self.wndMain:Toggle()
+            self.wndMain:Show(not self.wndMain:IsVisible())
         elseif options.reset then
             self:CPrint("Resetting RareTimer db")
             self.db:ResetProfile()
@@ -209,7 +208,6 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
 
             self:SendState(entry, nil, true)
             --]]
-            self:InitMainWindow()
         else
             self.opt.print_help()
         end
