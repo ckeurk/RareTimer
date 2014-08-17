@@ -147,6 +147,7 @@ function RareTimer:OnEnable()
     Apollo.RegisterEventHandler("UnitCreated", "OnUnitCreated", self)
     Apollo.RegisterEventHandler("UnitDestroyed", "OnUnitDestroyed", self)
     Apollo.RegisterEventHandler("ChangeWorld", "OnChangeWorld", self)
+    Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
 
     -- Status update channel
     self.channel = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
@@ -208,6 +209,8 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
 
             self:SendState(entry, nil, true)
             --]]
+            Print(inspect(getmetatable(self.wndMain)))
+            Print(self.wndMain:IsVisible())
         else
             self.opt.print_help()
         end
@@ -299,6 +302,11 @@ function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
         --self:PrintTable(tMsg)
     end
     self:ReceiveData(tMsg)
+end
+
+-- Register the window with Wildstar's window management
+function RareTimer:OnWindowManagementReady()
+    Event_FireGenericEvent("WindowManagementAdd", { wnd = self.wndMain, strName = "RareTimer" })
 end
 
 -----------------------------------------------------------------------------------------------
