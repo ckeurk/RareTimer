@@ -12,6 +12,12 @@ L["Status"] = true
 L["Last kill"] = true
 L["Health"] = true
 
+--Option strings
+L["OptTargetTimeout"] = "Suppress alert after targeting (minutes)"
+L["OptTargetTimeoutDesc"] = "Don't alert if we have targetted the mob within the timeout"
+L["OptPlaySound"] = "Play sound"
+L["OptPlaySoundDesc"] = "Play a sound when the alert is triggered"
+
 --Time strings
 L["s"] = true -- Seconds
 L["m"] = true -- Minutes

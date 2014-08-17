@@ -1,3 +1,5 @@
+-- Thanks to Leosky for the proper translations. The butchered ones are my own. :D
+
 local Locale = "frFR"
 local IsDefaultLocale = false
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RareTimer", Locale, IsDefaultLocale)
@@ -7,11 +9,17 @@ L["LocaleName"] = Locale
 
 --Heading strings
 L["CmdListHeading"] = "RareTimer registre d'état:" 
-L["AlertHeading"] = "RareTimer alerte:"
+L["AlertHeading"] = "Alerte de RareTimer:"
 L["Name"] = "Nom"
 L["Status"] = "Condition"
 L["Last kill"] = "Tué"
 L["Health"] = "Vie"
+
+--Option strings
+L["OptTargetTimeout"] = "N'alerter pas après avoir ciblé (minutes)"
+L["OptTargetTimeoutDesc"] = "N'alerter pas si on a ciblé l'ennemi dans le délai."
+L["OptPlaySound"] = "Faire sonner"
+L["OptPlaySoundDesc"] = "Faire sonner lorsque l'alerte est déclencher."
 
 --Time strings
 L["s"] = "s" -- Seconds

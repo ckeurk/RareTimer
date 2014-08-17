@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 7
+local MAJOR, MINOR = "RareTimer-0.1", 8
 
 local DEBUG = false -- Debug mode
 
@@ -59,6 +59,8 @@ local MsgTypes = {
 -- RareTimer Module Definition
 -----------------------------------------------------------------------------------------------
 local RareTimer = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(MAJOR, false) -- Configure = false
+local GeminiConfig = Apollo.GetPackage("Gemini:Config-1.0").tPackage
+local ConfigDialog = Apollo.GetPackage("Gemini:ConfigDialog-1.0").tPackage
 local GeminiGUI = Apollo.GetPackage("Gemini:GUI-1.0").tPackage
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:GetLocale("RareTimer", true) -- Silent = true
 local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
@@ -66,6 +68,32 @@ local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
 -----------------------------------------------------------------------------------------------
 -- Config/DB init
 -----------------------------------------------------------------------------------------------
+local optionsTable = {
+    type = "group",
+    args = {
+        targettimeout = {
+            name = L["OptTargetTimeout"],
+            desc = L["OptTargetTimeoutDesc"],
+            type = "input",
+            order = 10,
+            validate = function(info, val) 
+                local num = tonumber(val)
+                return num > 0 and num <= 30 and math.floor(num) == num
+            end,
+            set = function(info, val) RareTimer.db.profile.config.LastTargetTimeout = tonumber(val) * 60 end,
+            get = function(info) return tostring(math.floor(RareTimer.db.profile.config.LastTargetTimeout / 60)) end,
+        },
+        playsound = {
+            name = L["OptPlaySound"],
+            desc = L["OptPlaySoundDesc"],
+            type = "toggle",
+            order = 20,
+            set = function(info, val) RareTimer.db.profile.config.PlaySound = val end,
+            get = function(info) return RareTimer.db.profile.config.PlaySound end,
+        },
+    }
+}
+
 local defaults = {
     profile = {
         config = {
@@ -122,9 +150,14 @@ local defaults = {
 -- RareTimer OnInitialize
 -----------------------------------------------------------------------------------------------
 function RareTimer:OnInitialize()
+    -- Init db
     self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-    -- Init
+    -- Init config
+    GeminiConfig:RegisterOptionsTable("RareTimer", optionsTable)
+	ConfigDialog:SetDefaultSize("RareTimer", 300, 250)
+
+    -- Done init
     self.IsLoading = false
 end
 
@@ -196,6 +229,8 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self:CPrint("Resetting RareTimer db")
             self.db:ResetProfile()
             self.db:ResetDB()
+        elseif options.config then
+            ConfigDialog:Open("RareTimer")
         elseif options.test then
             --[[
             local now = GameLib.GetServerTime()
@@ -219,6 +254,7 @@ function RareTimer:AddOptions()
     self.opt.add_option{'-l', '--list', action='store_true', dest='list', help='List mobs'}
     self.opt.add_option{'-S', '--say', action='store', dest='say', help='Say mob status'}
     self.opt.add_option{'-c', '--channel', action='store', dest='channel', help='Channel to use for --say', default="p"}
+    self.opt.add_option{'-C', '--config', action='store_true', dest='config', help='Open configuration window'}
     self.opt.add_option{'-d', '--debug', action='store_true', dest='debug', help='debug mobs'}
     self.opt.add_option{'-D', '--debugconfig', action='store_true', dest='debugconfig', help='debug config'}
     self.opt.add_option{'-s', '--show', action='store_true', dest='show', help='Show window'}
@@ -977,6 +1013,22 @@ function RareTimer:InitMainWindow()
                 Base          = "BK3:btnHolo_Clear",
                 NoClip        = true,
                 Events = { ButtonSignal = function(_, wndHandler, wndControl) wndControl:GetParent():Close() end, },
+            },
+            { -- Config button
+                Name          = "ConfigButton",
+                WidgetType    = "PushButton",
+                AnchorPoints  = "TOPRIGHT",
+                AnchorOffsets = { -45, 1, -25, 21 },
+                Base          = "CRB_Basekit:kitBtn_Metal_Options",
+                NoClip        = true,
+                Events = { ButtonSignal = function(_, wndHandler, wndControl) 
+                    local ConfigDialog = Apollo.GetPackage("Gemini:ConfigDialog-1.0").tPackage
+                    if ConfigDialog.OpenFrames.RareTimer == nil then
+                        ConfigDialog:Open("RareTimer") 
+                    else
+                        ConfigDialog:Close("RareTimer")
+                    end
+                end, },
             },
             { -- Grid container
                 Name          = "GridContainer", 
