@@ -1,4 +1,4 @@
-package-as: RareTimer-@project-version@
+package-as: RareTimer
 enable-nolib-creation: no
 
 externals:

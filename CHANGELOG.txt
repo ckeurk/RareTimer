@@ -1,3 +1,7 @@
+0.1.10
+======
+-Enable automatic packaging for Curse
+
 0.1.9
 =====
 -Fix grid display update bug
