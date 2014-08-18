@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 10
+local MAJOR, MINOR = "RareTimer-0.1", 11
 
 local DEBUG = false -- Debug mode
 
@@ -1046,8 +1046,7 @@ function RareTimer:InitMainWindow()
                             { Name = L["Health"], Width = 60 },
                         },
                         Events = { 
-                            WindowLoad = RareTimer.PopulateGrid,
-                            WindowShow = RareTimer.PopulateGrid,
+                            WindowLoad = RareTimer.OnWindowLoad,
                         },
                     },
                 },
@@ -1065,6 +1064,23 @@ function RareTimer:InitMainWindow()
 
     local tWnd = GeminiGUI:Create(tWndDefinition)
     return tWnd:GetInstance()
+end
+
+-- Setup main window & window update timer
+function RareTimer:OnWindowLoad(wndHandler, wndControl)
+    local RT = RareTimer
+    self.wndMainControl = wndControl
+    RT.windowUpdateTimer = ApolloTimer.Create(10.0, true, "OnWindowUpdateTimer", RT) -- In seconds
+    RT:PopulateGrid(wndHandler, wndControl)
+end
+
+--Keep the window up to date
+function RareTimer:OnWindowUpdateTimer()
+    if self.wndMain:IsVisible() then
+        local grid = self.wndMain:FindChild("StatusGrid")
+        grid:DeleteAll()
+        self:PopulateGrid(nil, grid)
+    end
 end
 
 --Populate grid with list of mobs
