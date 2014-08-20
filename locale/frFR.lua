@@ -10,12 +10,21 @@ L["LocaleName"] = Locale
 --Heading strings
 L["CmdListHeading"] = "RareTimer registre d'état:" 
 L["AlertHeading"] = "Alerte de RareTimer:"
+L["SnoozeMsg"] = "RareTimer: N'alerter pas pour %s minutes."
+L["SnoozeResetMsg"] = "RareTimer: Rappel d'alarme remise à zéro."
 L["Name"] = "Nom"
 L["Status"] = "Condition"
 L["Last kill"] = "Tué"
 L["Health"] = "Vie"
 
+--Button strings
+L["Snooze"] = "Rappel"
+
 --Option strings
+L["OptSnoozeTimeout"] = "Durée du rappel d'alarme (minutes)"
+L["OptSnoozeTimeoutDesc"] = "Durée pendant qu'on n'alerte pas apres rappel d'alarm."
+L["OptSnoozeReset"] = "Remiser à zéro le rappel d'alarm"
+L["OptSnoozeResetDesc"] = "Remiser à zéro le rappel d'alarm"
 L["OptTargetTimeout"] = "N'alerter pas après avoir ciblé (minutes)"
 L["OptTargetTimeoutDesc"] = "N'alerter pas si on a ciblé l'ennemi dans le délai."
 L["OptPlaySound"] = "Faire sonner"

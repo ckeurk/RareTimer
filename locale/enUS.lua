@@ -7,12 +7,21 @@ L["LocaleName"] = Locale
 --Heading strings
 L["CmdListHeading"] = "RareTimer status list:"
 L["AlertHeading"] = "RareTimer alert:"
+L["SnoozeMsg"] = "RareTimer: Suppressing alerts for %s minutes."
+L["SnoozeResetMsg"] = "RareTimer: Snooze reset."
 L["Name"] = true
 L["Status"] = true
 L["Last kill"] = true
 L["Health"] = true
 
+--Button strings
+L["Snooze"] = true
+
 --Option strings
+L["OptSnoozeTimeout"] = "Snooze button duration (minutes)"
+L["OptSnoozeTimeoutDesc"] = "Don't alert for this long after snoozing"
+L["OptSnoozeReset"] = "Reset snooze"
+L["OptSnoozeResetDesc"] = "Re-enable alerts before snooze expires"
 L["OptTargetTimeout"] = "Suppress alert after targeting (minutes)"
 L["OptTargetTimeoutDesc"] = "Don't alert if we have targetted the mob within the timeout"
 L["OptPlaySound"] = "Play sound"

@@ -12,7 +12,7 @@ require "ICCommLib"
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 11
+local MAJOR, MINOR = "RareTimer-0.1", 12
 
 local DEBUG = false -- Debug mode
 
@@ -71,14 +71,40 @@ local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
 local optionsTable = {
     type = "group",
     args = {
-        targettimeout = {
-            name = L["OptTargetTimeout"],
-            desc = L["OptTargetTimeoutDesc"],
+        snoozetimeout = {
+            name = L["OptSnoozeTimeout"],
+            desc = L["OptSnoozeTimeoutDesc"],
             type = "input",
             order = 10,
             validate = function(info, val) 
                 local num = tonumber(val)
-                return num > 0 and num <= 30 and math.floor(num) == num
+                return num ~= nil and num > 0 and num <= 480 and math.floor(num) == num
+            end,
+            set = function(info, val) 
+                RareTimer.db.profile.config.SnoozeTimeout = tonumber(val) * 60 
+                RareTimer:UpdateSnoozeTimer()
+            end,
+            get = function(info) return tostring(math.floor(RareTimer.db.profile.config.SnoozeTimeout / 60)) end,
+        },
+        snoozereset = {
+            name = L["OptSnoozeReset"],
+            desc = L["OptSnoozeResetDesc"],
+            type = "execute",
+            func = function() 
+                RareTimer.db.char.LastSnooze = nil 
+                RareTimer:UpdateSnoozeTimer()
+                RareTimer.CPrint(RareTimer, L["SnoozeResetMsg"])
+            end,
+            order = 20,
+        },
+        targettimeout = {
+            name = L["OptTargetTimeout"],
+            desc = L["OptTargetTimeoutDesc"],
+            type = "input",
+            order = 30,
+            validate = function(info, val) 
+                local num = tonumber(val)
+                return num ~= nil and num > 0 and num <= 30 and math.floor(num) == num
             end,
             set = function(info, val) RareTimer.db.profile.config.LastTargetTimeout = tonumber(val) * 60 end,
             get = function(info) return tostring(math.floor(RareTimer.db.profile.config.LastTargetTimeout / 60)) end,
@@ -87,7 +113,7 @@ local optionsTable = {
             name = L["OptPlaySound"],
             desc = L["OptPlaySoundDesc"],
             type = "toggle",
-            order = 20,
+            order = 40,
             set = function(info, val) RareTimer.db.profile.config.PlaySound = val end,
             get = function(info) return RareTimer.db.profile.config.PlaySound end,
         },
@@ -101,6 +127,7 @@ local defaults = {
             Slack = 600, --10m, MaxSpawn + Slack = Expired
             CombatTimeout = 300, -- 5m, leave combat state after no updates within this time
             ReportTimeout = 120, -- 2m, don't send basic sync broadcasts if we saw a report within this time
+            SnoozeTimeout = 1800, -- 30m, snooze button suppresses alerts for this period
             LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
             Track = {
                 L["Scorchwing"],
@@ -108,6 +135,9 @@ local defaults = {
                 --L["Scorchwing Scorchling"],
             }
         },
+    },
+    char = {
+        LastSnooze = nil,
     },
     realm = {
         LastBroadcast = nil,
@@ -155,7 +185,7 @@ function RareTimer:OnInitialize()
 
     -- Init config
     GeminiConfig:RegisterOptionsTable("RareTimer", optionsTable)
-	ConfigDialog:SetDefaultSize("RareTimer", 300, 250)
+	ConfigDialog:SetDefaultSize("RareTimer", 300, 335)
 
     -- Done init
     self.IsLoading = false
@@ -219,6 +249,7 @@ function RareTimer:OnRareTimerOn(sCmd, sInput)
             self:PrintTable(self:GetEntries())
         elseif options.debugconfig then
             self:PrintTable(self.db.profile.config)
+            self:PrintTable(self.db.char)
         elseif options.show then
             self.wndMain:Show(true)
         elseif options.hide then
@@ -969,13 +1000,27 @@ end
 
 --Send an alert
 function RareTimer:Alert(entry)
-    local age = self:GetAge(entry.LastTarget)
+    local snoozeAge = self:GetAge(self.db.char.LastSnooze)
+    if snoozeAge ~= nil and snoozeAge < self.db.profile.config.SnoozeTimeout then
+        return
+    end
+
+    local TargetAge = self:GetAge(entry.LastTarget)
     if age == nil or age > self.db.profile.config.LastTargetTimeout then
         if self.db.profile.config.PlaySound then
             Sound.Play(Sound.PlayUIExplorerSignalDetection4)  
         end
         self:CPrint(string.format("%s %s: %s", L["AlertHeading"], entry.Name, self:GetStatusStr(entry)))
     end
+end
+
+--Suppress alerts for a period
+function RareTimer:Snooze()
+    local now = GameLib.GetServerTime()
+    local duration = math.floor(self.db.profile.config.SnoozeTimeout / 60)
+    self.db.char.LastSnooze = now
+    self:UpdateSnoozeTimer()
+    self:CPrint(string.format(L["SnoozeMsg"], duration))
 end
 
 --Init main window
@@ -1032,7 +1077,7 @@ function RareTimer:InitMainWindow()
             },
             { -- Grid container
                 Name          = "GridContainer", 
-                AnchorPoints = "CENTER",
+                AnchorPoints  = "CENTER",
                 AnchorOffsets = { -280, -100, 280, 85 },
                 Children = {
                     { -- Grid
@@ -1045,19 +1090,34 @@ function RareTimer:InitMainWindow()
                             { Name = L["Last kill"], Width = 100 },
                             { Name = L["Health"], Width = 60 },
                         },
-                        Events = { 
-                            WindowLoad = RareTimer.OnWindowLoad,
-                        },
+                        Events = { WindowLoad = RareTimer.OnWindowLoad, },
                     },
                 },
             },
             { -- Ok button
+                Name = "OkButton",
                 WidgetType = "PushButton",
                 Text = Apollo.GetString(kStringOk),
-                NoClip        = true,
                 AnchorPoints = "BOTTOMRIGHT",
                 AnchorOffsets = {-120,-45,-20,-15},
                 Events = { ButtonSignal = function(_, wndHandler, wndControl) wndControl:GetParent():Close() end, },
+            },
+            { -- Snooze button
+                Name = "SnoozeButton",
+                WidgetType = "PushButton",
+                Text = L["Snooze"],
+                AnchorPoints = "BOTTOMLEFT",
+                AnchorOffsets = {20,-45,120,-15},
+                Events = { ButtonSignal = function(_, wndHandler, wndControl) RareTimer:Snooze() end, },
+            },
+            { -- Snooze timer
+                Name = "SnoozeTimer",
+                WidgetType = "EditBox",
+                ReadOnly = true,
+                DT_RIGHT = true,
+                AnchorPoints = "BOTTOMLEFT",
+                AnchorOffsets = {120,-45,175,-15},
+                Events = { WindowLoad = RareTimer.UpdateSnoozeTimer, },
             },
         }
     }
@@ -1080,6 +1140,29 @@ function RareTimer:OnWindowUpdateTimer()
         local grid = self.wndMain:FindChild("StatusGrid")
         grid:DeleteAll()
         self:PopulateGrid(nil, grid)
+        self:UpdateSnoozeTimer()
+    end
+end
+
+--Update the timer showing the time left in a snooze
+function RareTimer:UpdateSnoozeTimer(wndHandler, wndControl)
+    local RT = RareTimer
+    local snoozeTimer 
+    if wndControl == nil then
+        snoozeTimer = RT.wndMain:FindChild("SnoozeTimer")
+    else
+        snoozeTimer = wndControl
+    end
+
+    local now = GameLib.GetServerTime()
+    local snoozeAge = RT:DiffTime(now, RT.db.char.LastSnooze)
+    if snoozeAge == nil or snoozeAge > RT.db.profile.config.SnoozeTimeout then
+        RT.db.char.LastSnooze = nil
+        snoozeTimer:Show(false)
+    else
+        snoozeTimer:Show(true)
+        local timeleft = math.floor((RT.db.profile.config.SnoozeTimeout - snoozeAge) / 60)
+        snoozeTimer:SetText(string.format("%d%s", timeleft, L["m"]))
     end
 end
 
