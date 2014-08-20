@@ -129,6 +129,7 @@ local defaults = {
             ReportTimeout = 120, -- 2m, don't send basic sync broadcasts if we saw a report within this time
             SnoozeTimeout = 1800, -- 30m, snooze button suppresses alerts for this period
             LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
+            NewerThreshold = 30, -- 0.5m, ignore reports unless they are at least this much newer
             Track = {
                 L["Scorchwing"],
                 --L["Honeysting Barbtail"],
@@ -750,7 +751,7 @@ function RareTimer:IsNewer(wsT2, wsT1)
     if wsT2 == nil or wsT1 == nil then
         return true
     end
-    return self:DiffTime(wsT2, wsT1) > 0
+    return self:DiffTime(wsT2, wsT1) > self.db.profile.config.NewerThreshold
 end
 
 -- Convert a duration in seconds to a shortform string
