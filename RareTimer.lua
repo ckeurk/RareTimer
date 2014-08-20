@@ -195,7 +195,7 @@ function RareTimer:OnEnable()
     Apollo.RegisterSlashCommand("raretimer", "OnRareTimerOn", self)
     self.opt = Optparse:OptionParser{usage="%prog [options]", command="raretimer"}
     if DEBUG then
-        SendVarToRover("Self opt", self.opt)
+        SendVarToRover("OptionParser", self.opt)
     end
     self:AddOptions()
 
@@ -216,7 +216,7 @@ function RareTimer:OnEnable()
     -- Timers
     self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
     if DEBUG then
-        SendVarToRover("Mobs", self.db.realm.mobs)
+        SendVarToRover("Mob Entries", self.db.realm.mobs)
     end
 
     -- Init config
@@ -362,8 +362,7 @@ function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
         tMsg.Header = {strSender = strSender}
     end
     if DEBUG then
-        SendVarToRover('Msg', tMsg)
-        --self:PrintTable(tMsg)
+        SendVarToRover('Received Msg', tMsg)
     end
     self:ReceiveData(tMsg)
 end
@@ -867,7 +866,7 @@ function RareTimer:SendData(data, test)
     msg.Header.Locale = L["LocaleName"]
 
     if DEBUG then
-        --self:CPrint(string.format("Sending data for %s", msg.Name))
+        SendVarToRover("Sent Data", msg)
     end
 
     -- If a test message, don't actually broadcast
@@ -901,8 +900,7 @@ function RareTimer:ReceiveData(msg)
 
     if not self:ValidData(msg) then
         if DEBUG then
-            self:CPrint("Invalid data received.")
-            self:PrintTable(msg)
+            SendVarToRover("Invalid msg", msg)
         end
         return
     end
@@ -912,7 +910,7 @@ function RareTimer:ReceiveData(msg)
     local name = L[data.Name]
     if not self:IsNotable(name) then
         if DEBUG then
-            self:CPrint(string.format("Received unexpected name: %s (Raw: %s)", name, data.Name))
+            SendVarToRover("Invalid name received", data.Name)
         end
         return
     end
