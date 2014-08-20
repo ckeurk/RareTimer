@@ -183,10 +183,6 @@ function RareTimer:OnInitialize()
     -- Init db
     self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
 
-    -- Init config
-    GeminiConfig:RegisterOptionsTable("RareTimer", optionsTable)
-	ConfigDialog:SetDefaultSize("RareTimer", 300, 335)
-
     -- Done init
     self.IsLoading = false
 end
@@ -222,6 +218,10 @@ function RareTimer:OnEnable()
     if DEBUG then
         SendVarToRover("Mobs", self.db.realm.mobs)
     end
+
+    -- Init config
+    GeminiConfig:RegisterOptionsTable("RareTimer", optionsTable)
+	ConfigDialog:SetDefaultSize("RareTimer", 300, 335)
 
     -- Window
     self.wndMain = self:InitMainWindow()
