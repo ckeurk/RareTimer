@@ -953,7 +953,7 @@ end
 -- Inform user that a new version is available but not backwards compatible
 function RareTimer:OutOfDate()
     if self.Outdated == nil then
-        self:CPrint("RareTimer is out of date and will no longer receive updates from other clients")
+        self:CPrint(L["ObsoleteVersionMsg"])
         self.Outdated = true
     end
 end
@@ -961,7 +961,7 @@ end
 -- Inform user that a newer version is available to download
 function RareTimer:UpdateAvailable()
     if self.Updatable == nil then
-        self:CPrint("A new version of RareTimer is available.")
+        self:CPrint(L["NewVersionMsg"])
         self.Updatable = true
     end
 end

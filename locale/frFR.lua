@@ -10,12 +10,16 @@ L["LocaleName"] = Locale
 --Heading strings
 L["CmdListHeading"] = "RareTimer registre d'état:" 
 L["AlertHeading"] = "Alerte de RareTimer:"
-L["SnoozeMsg"] = "RareTimer: N'alerter pas pour %s minutes."
-L["SnoozeResetMsg"] = "RareTimer: Rappel d'alarme remise à zéro."
 L["Name"] = "Nom"
 L["Status"] = "Condition"
 L["Last kill"] = "Tué"
 L["Health"] = "Vie"
+
+--Msgs
+L["NewVersionMsg"] = "Une nouvelle version de RareTimer est disponible."
+L["ObsoleteVersionMsg"] = "RareTimer n'est pas à jour et ne recevra plus de mises à jour d'autres clients."
+L["SnoozeMsg"] = "RareTimer: N'alerter pas pour %s minutes."
+L["SnoozeResetMsg"] = "RareTimer: Rappel d'alarme remise à zéro."
 
 --Button strings
 L["Snooze"] = "Rappel"
