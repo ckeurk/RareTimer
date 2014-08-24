@@ -8,6 +8,14 @@ require "math"
 require "string"
 require "GameLib"
 require "ICCommLib"
+
+-----------------------------------------------------------------------------------------------
+-- Local caching
+-----------------------------------------------------------------------------------------------
+local string = string
+local math = math
+local GameLib = GameLib
+local ICCommLib = ICCommLib
  
 -----------------------------------------------------------------------------------------------
 -- Constants
@@ -16,6 +24,7 @@ local MAJOR, MINOR = "RareTimer-0.1", 13
 
 local DEBUG = false -- Debug mode
 
+-- Apollo strings
 kStringOk = 3
 
 -- Data sources
