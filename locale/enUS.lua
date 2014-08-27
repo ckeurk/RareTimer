@@ -17,6 +17,8 @@ L["NewVersionMsg"] = "A new version of RareTimer is available."
 L["ObsoleteVersionMsg"] = "RareTimer is out of date and will no longer receive updates from other clients."
 L["SnoozeMsg"] = "RareTimer: Suppressing alerts for %s minutes."
 L["SnoozeResetMsg"] = "RareTimer: Snooze reset."
+L["Y"] = true -- Yes
+L["N"] = true -- No
 
 --Button strings
 L["Snooze"] = true
