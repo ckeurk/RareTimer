@@ -90,30 +90,9 @@ end
 local optionsTable = {
     type = "group",
     args = {
-        snoozetimeout = {
-            name = L["OptSnoozeTimeout"],
-            desc = L["OptSnoozeTimeoutDesc"],
-            type = "input",
-            order = nextPos(),
-            validate = function(info, val) 
-                local num = tonumber(val)
-                return num ~= nil and num > 0 and num <= 480 and math.floor(num) == num
-            end,
-            set = function(info, val) 
-                RareTimer.db.profile.config.SnoozeTimeout = tonumber(val) * 60 
-                RareTimer:UpdateSnoozeTimer()
-            end,
-            get = function(info) return tostring(math.floor(RareTimer.db.profile.config.SnoozeTimeout / 60)) end,
-        },
-        snoozereset = {
-            name = L["OptSnoozeReset"],
-            desc = L["OptSnoozeResetDesc"],
-            type = "execute",
-            func = function() 
-                RareTimer.db.char.LastSnooze = nil 
-                RareTimer:UpdateSnoozeTimer()
-                RareTimer.CPrint(RareTimer, L["SnoozeResetMsg"])
-            end,
+        settingsheader = {
+            name = L["OptSettingsHeader"],
+            type = "header",
             order = nextPos(),
         },
         targettimeout = {
@@ -136,6 +115,47 @@ local optionsTable = {
             set = function(info, val) RareTimer.db.profile.config.PlaySound = val end,
             get = function(info) return RareTimer.db.profile.config.PlaySound end,
         },
+
+        snoozeheader = {
+            name = L["OptSnoozeHeader"],
+            type = "header",
+            order = nextPos(),
+        },
+        snoozetimeout = {
+            name = L["OptSnoozeTimeout"],
+            desc = L["OptSnoozeTimeoutDesc"],
+            type = "input",
+            order = nextPos(),
+            validate = function(info, val) 
+                local num = tonumber(val)
+                return num ~= nil and num > 0 and num <= 480 and math.floor(num) == num
+            end,
+            set = function(info, val) 
+                RareTimer.db.profile.config.SnoozeTimeout = tonumber(val) * 60 
+                RareTimer:UpdateSnoozeTimer()
+            end,
+            get = function(info) return tostring(math.floor(RareTimer.db.profile.config.SnoozeTimeout / 60)) end,
+        },
+        snoozereset = {
+            name = L["OptSnoozeReset"],
+            desc = L["OptSnoozeResetDesc"],
+            type = "execute",
+            order = nextPos(),
+            func = function() 
+                RareTimer.db.char.LastSnooze = nil 
+                RareTimer:UpdateSnoozeTimer()
+                RareTimer.CPrint(RareTimer, L["SnoozeResetMsg"])
+            end,
+        },
+
+        --[[
+        alerts = {
+            name = L["OptAlertsHeader"],
+            type = "header",
+            order = nextPos(),
+        },
+        ]]--
+        -- Remaining widgits added by RareTimer:AddEntriesToConfig()
     }
 }
 
