@@ -81,6 +81,12 @@ local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
 -----------------------------------------------------------------------------------------------
 -- Config/DB init
 -----------------------------------------------------------------------------------------------
+local confPosition = 0
+function nextPos()
+    confPosition = confPosition + 10
+    return confPosition
+end
+
 local optionsTable = {
     type = "group",
     args = {
@@ -88,7 +94,7 @@ local optionsTable = {
             name = L["OptSnoozeTimeout"],
             desc = L["OptSnoozeTimeoutDesc"],
             type = "input",
-            order = 10,
+            order = nextPos(),
             validate = function(info, val) 
                 local num = tonumber(val)
                 return num ~= nil and num > 0 and num <= 480 and math.floor(num) == num
@@ -108,13 +114,13 @@ local optionsTable = {
                 RareTimer:UpdateSnoozeTimer()
                 RareTimer.CPrint(RareTimer, L["SnoozeResetMsg"])
             end,
-            order = 20,
+            order = nextPos(),
         },
         targettimeout = {
             name = L["OptTargetTimeout"],
             desc = L["OptTargetTimeoutDesc"],
             type = "input",
-            order = 30,
+            order = nextPos(),
             validate = function(info, val) 
                 local num = tonumber(val)
                 return num ~= nil and num > 0 and num <= 30 and math.floor(num) == num
@@ -126,7 +132,7 @@ local optionsTable = {
             name = L["OptPlaySound"],
             desc = L["OptPlaySoundDesc"],
             type = "toggle",
-            order = 40,
+            order = nextPos(),
             set = function(info, val) RareTimer.db.profile.config.PlaySound = val end,
             get = function(info) return RareTimer.db.profile.config.PlaySound end,
         },
