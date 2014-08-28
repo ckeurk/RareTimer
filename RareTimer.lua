@@ -24,6 +24,10 @@ local MAJOR, MINOR = "RareTimer-0.1", 13
 
 local DEBUG = false -- Debug mode
 
+-- Config window
+local CONFIGWIDTH = 335
+local CONFIGHEIGHT = 640
+
 -- Apollo strings
 kStringOk = 3
 
@@ -231,7 +235,7 @@ function RareTimer:OnEnable()
 
     -- Init config
     GeminiConfig:RegisterOptionsTable("RareTimer", optionsTable)
-	ConfigDialog:SetDefaultSize("RareTimer", 300, 335)
+	ConfigDialog:SetDefaultSize("RareTimer", CONFIGWIDTH, CONFIGHEIGHT)
 
     -- Window
     self.wndMain = self:InitMainWindow()
