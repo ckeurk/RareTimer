@@ -148,13 +148,11 @@ local optionsTable = {
             end,
         },
 
-        --[[
         alerts = {
             name = L["OptAlertsHeader"],
             type = "header",
             order = nextPos(),
         },
-        ]]--
         -- Remaining widgits added by RareTimer:AddEntriesToConfig()
     }
 }
@@ -170,9 +168,14 @@ local defaults = {
             LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
             NewerThreshold = 30, -- 0.5m, ignore reports unless they are at least this much newer
             Track = {
+                L["Bugwit"],
+                --L["Grinder"], -- Shares name with npc in Thayd
+                L["KE-27 Sentinel"],
                 L["Scorchwing"],
-                --L["Honeysting Barbtail"],
-                --L["Scorchwing Scorchling"],
+                L["Subject J"],
+                L["Subject K"],
+                L["Subject Tau"],
+                L["Subject V"],
             }
         },
     },
@@ -188,12 +191,13 @@ local defaults = {
                 --Killed
                 --Timestamp
                 MinSpawn = 0,
-                MaxSpawn = 86400, -- 1 day
+                MaxSpawn = 0,
                 --MinDue
                 --MaxDue
                 --Expires
                 --LastReport
                 --LastTarget
+                AlertOn = true,
             },
             {    
                 Name = L["Scorchwing"],
@@ -201,13 +205,34 @@ local defaults = {
                 MaxSpawn = 6600, --110m
             },
             --[[
-            {    
-                Name = L["Honeysting Barbtail"],
-                MinSpawn = 120, --2m
-                MaxSpawn = 600, --10m
+            {
+                Name = L["Bugwit"],
+                AlertOn = false,
             },
+            {
+                Name = L["KE-27 Sentinel"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Subject J"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Subject K"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Subject Tau"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Subject V"],
+                AlertOn = false,
+            },
+            --]]
+            --[[
             {    
-                Name = L["Scorchwing Scorchling"],
+                Name = L["Honeysting Barbtail"], -- Test mob
                 MinSpawn = 120, --2m
                 MaxSpawn = 600, --10m
             },
@@ -260,6 +285,7 @@ function RareTimer:OnEnable()
     end
 
     -- Init config
+    self:AddEntriesToConfig()
     GeminiConfig:RegisterOptionsTable("RareTimer", optionsTable)
 	ConfigDialog:SetDefaultSize("RareTimer", CONFIGWIDTH, CONFIGHEIGHT)
 
@@ -1038,6 +1064,10 @@ end
 
 --Send an alert
 function RareTimer:Alert(entry)
+    if not entry.AlertOn then
+        return
+    end
+
     local snoozeAge = self:GetAge(self.db.char.LastSnooze)
     if snoozeAge ~= nil and snoozeAge < self.db.profile.config.SnoozeTimeout then
         return
@@ -1049,6 +1079,23 @@ function RareTimer:Alert(entry)
             Sound.Play(Sound.PlayUIExplorerSignalDetection4)  
         end
         self:CPrint(string.format("%s %s: %s", L["AlertHeading"], entry.Name, self:GetStatusStr(entry)))
+    end
+end
+
+-- Add per-entry config settings to config window
+function RareTimer:AddEntriesToConfig()
+    for _, entry in pairs(self:GetEntries()) do
+        optionsTable.args["Alert" .. entry.Name] = {
+            name = entry.Name,
+            desc = L["OptAlertDesc"],
+            type = "toggle",
+            get = function(info)
+                return entry.AlertOn
+            end,
+            set = function(info, value) 
+                entry.AlertOn = value
+            end,
+        }
     end
 end
 
