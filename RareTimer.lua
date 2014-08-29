@@ -169,7 +169,7 @@ local defaults = {
             NewerThreshold = 30, -- 0.5m, ignore reports unless they are at least this much newer
             Track = {
                 L["Bugwit"],
-                --L["Grinder"], -- Shares name with npc in Thayd
+                L["Grinder"], -- Note: Shares name with npc in Thayd
                 L["KE-27 Sentinel"],
                 L["Scorchwing"],
                 L["Subject J"],
@@ -204,9 +204,12 @@ local defaults = {
                 MinSpawn = 3600, --60m
                 MaxSpawn = 6600, --110m
             },
-            --[[
             {
                 Name = L["Bugwit"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Grinder"],
                 AlertOn = false,
             },
             {
@@ -229,7 +232,6 @@ local defaults = {
                 Name = L["Subject V"],
                 AlertOn = false,
             },
-            --]]
             --[[
             {    
                 Name = L["Honeysting Barbtail"], -- Test mob
@@ -599,7 +601,11 @@ function RareTimer:GetStatusStr(entry)
         when = entry.Timestamp
     end
 
-    return string.format(strState, self:FormatDate(self:LocalTime(when)))
+    if when ~= nil then
+        return string.format(strState, self:FormatDate(self:LocalTime(when)))
+    else
+        return strState
+    end
 end
 
 -- Convert a date to a string in the format YYYY-MM-DD hh:mm:ss pp
@@ -1261,8 +1267,11 @@ function RareTimer:PopulateGrid(wndHandler, wndControl)
     for i=1, #entries do
         name = entries[i].Name
         state = RT:GetStatusStr(entries[i])
+        killed = "--"
         age = RT:GetAge(entries[i].Killed)
-        killed = RT:DurToStr(age)
+        if age ~= nil then
+            killed = RT:DurToStr(age)
+        end
         health = "--"
         if entries[i].Health ~= nil then
             health = string.format("%d%%", entries[i].Health)
