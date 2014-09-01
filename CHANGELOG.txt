@@ -1,5 +1,9 @@
+0.1.15
+======
+-Corrects names for Subject J, K & V
+
 0.1.14
-=====
+======
 -Added requested mobs (go into options to enable alerts for these
 mobs):
   -Bugwit
@@ -11,15 +15,15 @@ mobs):
   -Subject V
 
 0.1.13
-=====
+======
 -Misc bugfixes
 
 0.1.12
-=====
+======
 -Add snooze button
 
 0.1.11
-=====
+======
 -Fix grid display update bug, take 2
 
 0.1.10
