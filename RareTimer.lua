@@ -217,11 +217,11 @@ local defaults = {
                 AlertOn = false,
             },
             {
-                Name = L["Subject J"],
+                Name = L["Subject J - Fiend"],
                 AlertOn = false,
             },
             {
-                Name = L["Subject K"],
+                Name = L["Subject K - Brute"],
                 AlertOn = false,
             },
             {
@@ -229,7 +229,7 @@ local defaults = {
                 AlertOn = false,
             },
             {
-                Name = L["Subject V"],
+                Name = L["Subject V - Tempest"],
                 AlertOn = false,
             },
             --[[
