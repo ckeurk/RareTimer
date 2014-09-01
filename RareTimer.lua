@@ -172,10 +172,10 @@ local defaults = {
                 L["Grinder"], -- Note: Shares name with npc in Thayd
                 L["KE-27 Sentinel"],
                 L["Scorchwing"],
-                L["Subject J"],
-                L["Subject K"],
+                L["Subject J - Fiend"],
+                L["Subject K - Brute"],
                 L["Subject Tau"],
-                L["Subject V"],
+                L["Subject V - Tempest"],
             }
         },
     },
