@@ -52,5 +52,11 @@ L["StateInCombat"] = 'En combat'
 L["StateExpired"] = 'Inconnu (vu la dernière fois à %s)'
  
 -- Mob names
+L["Bugwit"] = true
+L["Grinder"] = "Broyeur" 
+L["KE-27 Sentinel"] = "Sentinelle KE-27"
 L["Scorchwing"] = 'Ailardente'
-
+L["Subject J - Fiend"] = "Sujet J : démon"
+L["Subject K - Brute"] = "Sujet K : brute"
+L["Subject Tau"] = "Sujet Tau"
+L["Subject V - Tempest"] = "Sujet V : tempête"
