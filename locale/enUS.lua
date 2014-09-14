@@ -53,11 +53,21 @@ L["StateInCombat"] = 'In combat'
 L["StateExpired"] = 'Unknown (last seen %s)'
 
 -- Mob names
+L["Aggregor the Dust Eater"] = true
 L["Bugwit"] = true
+L["Defensive Protocol Unit"] = true
+L["Doomthorn the Ancient"] = true
+L["Grendelus the Guardian"] = true
 L["Grinder"] = true
+L["Hoarding Stemdragon"] = true
 L["KE-27 Sentinel"] = true
+L["King Honeygrave"] = true
+L["Kraggar the Earth-Render"] = true
+L["Metal Maw"] = true
+L["Metal Maw Prime"] = true
 L["Scorchwing"] = true
 L["Subject J - Fiend"] = true
 L["Subject K - Brute"] = true
 L["Subject Tau"] = true
 L["Subject V - Tempest"] = true
+L["Zoetic"] = true

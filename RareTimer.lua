@@ -26,7 +26,7 @@ local DEBUG = false -- Debug mode
 
 -- Config window
 local CONFIGWIDTH = 335
-local CONFIGHEIGHT = 640
+local CONFIGHEIGHT = 740
 
 -- Apollo strings
 kStringOk = 3
@@ -168,14 +168,24 @@ local defaults = {
             LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
             NewerThreshold = 30, -- 0.5m, ignore reports unless they are at least this much newer
             Track = {
+                L["Aggregor the Dust Eater"],
                 L["Bugwit"],
+                L["Defensive Protocol Unit"],
+                L["Doomthorn the Ancient"],
+                L["Grendelus the Guardian"],
                 L["Grinder"], -- Note: Shares name with npc in Thayd
+                L["Hoarding Stemdragon"],
                 L["KE-27 Sentinel"],
+                L["King Honeygrave"],
+                L["Kraggar the Earth-Render"],
+                L["Metal Maw"],
+                L["Metal Maw Prime"],
                 L["Scorchwing"],
                 L["Subject J - Fiend"],
                 L["Subject K - Brute"],
                 L["Subject Tau"],
                 L["Subject V - Tempest"],
+                L["Zoetic"],
             }
         },
     },
@@ -205,7 +215,23 @@ local defaults = {
                 MaxSpawn = 6600, --110m
             },
             {
+                Name = L["Aggregor the Dust Eater"],
+                AlertOn = false,
+            },
+            {
                 Name = L["Bugwit"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Defensive Protocol Unit"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Doomthorn the Ancient"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Grendelus the Guardian"],
                 AlertOn = false,
             },
             {
@@ -213,7 +239,27 @@ local defaults = {
                 AlertOn = false,
             },
             {
+                Name = L["Hoarding Stemdragon"],
+                AlertOn = false,
+            },
+            {
                 Name = L["KE-27 Sentinel"],
+                AlertOn = false,
+            },
+            {
+                Name = L["King Honeygrave"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Kraggar the Earth-Render"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Metal Maw"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Metal Maw Prime"],
                 AlertOn = false,
             },
             {
@@ -230,6 +276,10 @@ local defaults = {
             },
             {
                 Name = L["Subject V - Tempest"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Zoetic"],
                 AlertOn = false,
             },
             --[[

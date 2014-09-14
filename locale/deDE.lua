@@ -25,11 +25,21 @@ L["StateInCombat"] = 'In combat (%d%%)'
 L["StateExpired"] = 'Unknown (last seen %s)'
 
 -- Mob names
+L["Aggregor the Dust Eater"] = "Aggregor der Staubfresser"
 L["Bugwit"] = "Kleinsinn"
+L["Defensive Protocol Unit"] = "Defensivprotokolleinheit"
+L["Doomthorn the Ancient"] = "Schicksalsdorn der Alte"
+L["Grendelus the Guardian"] = "Grendelus der Wächter"
 L["Grinder"] = "Schleifer"
+L["Hoarding Stemdragon"] = "Hortender Stieldrache"
 L["KE-27 Sentinel"] = "Wache KE-27"
+L["King Honeygrave"] = "König Honiggrab"
+L["Kraggar the Earth-Render"] = "Kraggar der Erdreißer"
+L["Metal Maw"] = "Laserschlund"
+L["Metal Maw Prime"] = "Laserschlund Prime"
 L["Scorchwing"] = "Sengschwinge"
 L["Subject J - Fiend"] = "Subjekt J - Scheusal"
 L["Subject K - Brute"] = "Subjekt K - Widerling"
 L["Subject Tau"] = "Objekt: Tau"
 L["Subject V - Tempest"] = "Subjekt V - Sturm"
+L["Zoetic"] = "Zoetik"
