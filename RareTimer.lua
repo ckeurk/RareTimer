@@ -215,23 +215,7 @@ local defaults = {
                 MaxSpawn = 6600, --110m
             },
             {
-                Name = L["Aggregor the Dust Eater"],
-                AlertOn = false,
-            },
-            {
                 Name = L["Bugwit"],
-                AlertOn = false,
-            },
-            {
-                Name = L["Defensive Protocol Unit"],
-                AlertOn = false,
-            },
-            {
-                Name = L["Doomthorn the Ancient"],
-                AlertOn = false,
-            },
-            {
-                Name = L["Grendelus the Guardian"],
                 AlertOn = false,
             },
             {
@@ -239,27 +223,7 @@ local defaults = {
                 AlertOn = false,
             },
             {
-                Name = L["Hoarding Stemdragon"],
-                AlertOn = false,
-            },
-            {
                 Name = L["KE-27 Sentinel"],
-                AlertOn = false,
-            },
-            {
-                Name = L["King Honeygrave"],
-                AlertOn = false,
-            },
-            {
-                Name = L["Kraggar the Earth-Render"],
-                AlertOn = false,
-            },
-            {
-                Name = L["Metal Maw"],
-                AlertOn = false,
-            },
-            {
-                Name = L["Metal Maw Prime"],
                 AlertOn = false,
             },
             {
@@ -276,6 +240,42 @@ local defaults = {
             },
             {
                 Name = L["Subject V - Tempest"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Aggregor the Dust Eater"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Defensive Protocol Unit"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Doomthorn the Ancient"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Grendelus the Guardian"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Hoarding Stemdragon"],
+                AlertOn = false,
+            },
+            {
+                Name = L["King Honeygrave"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Kraggar the Earth-Render"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Metal Maw"],
+                AlertOn = false,
+            },
+            {
+                Name = L["Metal Maw Prime"],
                 AlertOn = false,
             },
             {
