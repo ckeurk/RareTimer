@@ -20,7 +20,7 @@ local ICCommLib = ICCommLib
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 16
+local MAJOR, MINOR = "RareTimer-0.1", 17
 
 local DEBUG = false -- Debug mode
 
