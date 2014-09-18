@@ -722,7 +722,7 @@ function RareTimer:UpdateState()
             self:SetState(mob, States.Expired, Source.Timer)
             return
         -- Set pending spawn
-        elseif self:IsDue(mob) then
+        elseif mob.State ~= States.Pending and self:IsDue(mob) then
             self:SetState(mob, States.Pending, Source.Timer)
             return
         end
@@ -1050,7 +1050,9 @@ function RareTimer:ReceiveData(msg)
         end
         entry.State = data.State
         entry.Health = data.Health
-        entry.Killed = data.Killed
+        if data.Killed ~= nil and (entry.Killed == nil or self:IsNewer(data.Killed, entry.Killed)) then
+            entry.Killed = data.Killed
+        end
         entry.Timestamp = data.Timestamp
         entry.Source = Source.Report
         entry.LastReport = now
