@@ -56,6 +56,7 @@ L["StateExpired"] = 'Unknown (last seen %s)'
 -- Mob names
 L["Aggregor the Dust Eater"] = true
 L["Bugwit"] = true
+L["Critical Containment"] = true
 L["Defensive Protocol Unit"] = true
 L["Doomthorn the Ancient"] = true
 L["Grendelus the Guardian"] = true

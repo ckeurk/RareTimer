@@ -27,6 +27,7 @@ L["StateExpired"] = 'Unknown (last seen %s)'
 -- Mob names
 L["Aggregor the Dust Eater"] = "Aggregor der Staubfresser"
 L["Bugwit"] = "Kleinsinn"
+L["Critical Containment"] = "Kritische Isolation"
 L["Defensive Protocol Unit"] = "Defensivprotokolleinheit"
 L["Doomthorn the Ancient"] = "Schicksalsdorn der Alte"
 L["Grendelus the Guardian"] = "Grendelus der Wächter"
