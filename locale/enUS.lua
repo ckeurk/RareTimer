@@ -1,6 +1,7 @@
 local Locale = "enUS"
 local IsDefaultLocale = true
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RareTimer", Locale, IsDefaultLocale)
+local Silent = true
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("RareTimer", Locale, IsDefaultLocale, Silent)
 
 L["LocaleName"] = Locale
 
