@@ -68,6 +68,13 @@ local MsgTypes = {
     New = 2,
 }
 
+-- What we know about the spawn time
+local Spawn = {
+    Other = 0,
+    Window = 1,
+    Timer = 2,
+}
+
 -----------------------------------------------------------------------------------------------
 -- RareTimer Module Definition
 -----------------------------------------------------------------------------------------------
@@ -202,6 +209,7 @@ local defaults = {
                 --Timestamp
                 MinSpawn = 0,
                 MaxSpawn = 0,
+                SpawnType = Spawn.Other,
                 --MinDue
                 --MaxDue
                 --Expires
@@ -213,6 +221,7 @@ local defaults = {
                 Name = L["Scorchwing"],
                 MinSpawn = 3600, --60m
                 MaxSpawn = 6600, --110m
+                SpawnTime = Spawn.Window,
             },
             {
                 Name = L["Bugwit"],
