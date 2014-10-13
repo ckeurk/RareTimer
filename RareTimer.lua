@@ -69,10 +69,16 @@ local MsgTypes = {
 }
 
 -- What we know about the spawn time
-local Spawn = {
+local SpawnTypes = {
     Other = 0,
     Window = 1,
     Timer = 2,
+}
+
+-- What type of thing are we tracking
+local AlertTypes = {
+    Mob = 0,
+    Event = 1,
 }
 
 -----------------------------------------------------------------------------------------------
@@ -209,7 +215,8 @@ local defaults = {
                 --Timestamp
                 MinSpawn = 0,
                 MaxSpawn = 0,
-                SpawnType = Spawn.Other,
+                SpawnType = SpawnTypes.Other,
+                AlertType = AlertTypes.Mob,
                 --MinDue
                 --MaxDue
                 --Expires
@@ -221,7 +228,7 @@ local defaults = {
                 Name = L["Scorchwing"],
                 MinSpawn = 3600, --60m
                 MaxSpawn = 6600, --110m
-                SpawnTime = Spawn.Window,
+                SpawnTime = SpawnTypes.Window,
             },
             {
                 Name = L["Bugwit"],
