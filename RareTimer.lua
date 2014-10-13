@@ -180,6 +180,7 @@ local defaults = {
             SnoozeTimeout = 1800, -- 30m, snooze button suppresses alerts for this period
             LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
             NewerThreshold = 30, -- 0.5m, ignore reports unless they are at least this much newer
+            WarnAhead = 600, -- 10m, send alert in advance by this much (for timer based alerts)
             Track = {
                 L["Aggregor the Dust Eater"],
                 L["Bugwit"],
@@ -299,6 +300,11 @@ local defaults = {
                 AlertOn = false,
             },
             --[[
+            {
+                Name = L["Critical Containment"],
+                AlertType = AlertTypes.Event,
+                SpawnType = SpawnTypes.Timer,
+            },
             {    
                 Name = L["Honeysting Barbtail"], -- Test mob
                 MinSpawn = 120, --2m
