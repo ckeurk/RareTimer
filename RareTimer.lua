@@ -178,6 +178,7 @@ local defaults = {
             CombatTimeout = 300, -- 5m, leave combat state after no updates within this time
             ReportTimeout = 120, -- 2m, don't send basic sync broadcasts if we saw a report within this time
             SnoozeTimeout = 1800, -- 30m, snooze button suppresses alerts for this period
+            UnknownTimeout = 3600, -- 1h, state changes to unknown if older, if MaxSpawn is undefined
             LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
             NewerThreshold = 30, -- 0.5m, ignore reports unless they are at least this much newer
             WarnAhead = 600, -- 10m, send alert in advance by this much (for timer based alerts)
@@ -214,8 +215,8 @@ local defaults = {
                 State = States.Unknown,
                 --Killed
                 --Timestamp
-                MinSpawn = 0,
-                MaxSpawn = 0,
+                --MinSpawn
+                --MaxSpawn
                 SpawnType = SpawnTypes.Other,
                 AlertType = AlertTypes.Mob,
                 --MinDue
@@ -754,7 +755,7 @@ end
 -- Check if an entry is due to spawn
 function RareTimer:IsDue(entry)
     local killedAgo = self:GetAge(entry.Killed)
-    if entry.MinSpawn == nil or entry.MinSpawn == nil or killedAgo == nil then
+    if entry.MinSpawn == nil or entry.MaxSpawn == nil or entry.MaxDue == nil or entry.killedAgo == nil then
         return false
     end
 
@@ -773,9 +774,18 @@ end
 
 -- Check if an entry is expired
 function RareTimer:IsExpired(entry)
+    if entry.State == States.Pending and entry.MaxDue == nil then
+        return true
+    end
+
     local ago = self:GetAge(entry.Timestamp)
     local killedAgo = self:GetAge(entry.Killed)
-    local maxAge = entry.MaxSpawn + self.db.profile.config.Slack
+    local maxAge
+    if entry.MaxSpawn ~= nil then
+        maxAge = entry.MaxSpawn + self.db.profile.config.Slack
+    else
+        maxAge = self.db.profile.config.UnknownTimeout
+    end
     if (ago ~= nil and ago > maxAge) or (killedAgo ~= nil and killedAgo > maxAge) then
         return true
     else
