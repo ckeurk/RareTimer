@@ -754,8 +754,8 @@ end
 -- Check if an entry is due to spawn
 function RareTimer:IsDue(entry)
     local killedAgo = self:GetAge(entry.Killed)
-    if killedAgo == nil then
-        return
+    if entry.MinSpawn == nil or entry.MinSpawn == nil or killedAgo == nil then
+        return false
     end
 
     -- Move the due time up if we only saw the corpse, not the kill
@@ -809,8 +809,8 @@ function RareTimer:SetState(entry, state, source)
     if entry.State ~= state then
         entry.State = state
         entry.Timestamp = now
+        entry.Source = source
     end
-    entry.Source = source
     if (state ~= States.Alive and state ~= States.InCombat) then
         self:SetHealth(entry, nil)
     end
