@@ -16,13 +16,13 @@ L["h"] = true -- Hours
 L["d"] = true -- Days
 
 -- State strings
-L["StateUnknown"] = 'Unknown'
-L["StateKilled"] = 'Killed at %s'
-L["StateDead"] = 'Killed at or before %s'
-L["StatePending"] = 'Due to spawn before %s'
-L["StateAlive"] = 'Alive (as of %s)'
-L["StateInCombat"] = 'In combat (%d%%)'
-L["StateExpired"] = 'Unknown (last seen %s)'
+L["StateUnknown"] = 'Unbekannt'
+L["StateKilled"] = 'Bei %s get�tet'
+L["StateDead"] = 'Bei oder vor %s Uhr get�tet'
+L["StatePending"] = 'Aufgrund vor %s laichen'
+L["StateAlive"] = 'Alive (ab %s Uhr)'
+L["StateInCombat"] = 'im Kampf (%d%%)'
+L["StateExpired"] = 'Unbekannt (zuletzt gesehen %s)'
 
 -- Mob names
 L["Aggregor the Dust Eater"] = "Aggregor der Staubfresser"
