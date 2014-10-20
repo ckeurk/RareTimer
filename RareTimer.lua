@@ -652,9 +652,8 @@ function RareTimer:GetStatusStr(entry)
 
     local when
     local strState = 'ERROR'
-    if entry.State == States.Unknown then
+    if entry.State == States.Unknown or (entry.State == States.Expired and entry.Timestamp == nil) then
         strState = L["StateUnknown"]
-        when = entry.Timestamp
     elseif entry.State == States.Killed then
         strState = L["StateKilled"]
         when = entry.Killed
