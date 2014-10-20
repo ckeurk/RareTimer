@@ -23,6 +23,7 @@ local ICCommLib = ICCommLib
 local MAJOR, MINOR = "RareTimer-0.1", 17
 
 local DEBUG = false -- Debug mode
+local NONET = false -- Block send/receive data
 
 -- Config window
 local CONFIGWIDTH = 335
@@ -1023,6 +1024,10 @@ function RareTimer:SendData(data, test)
         SendVarToRover("Sent Data", msg)
     end
 
+    if NONET then
+        return
+    end
+
     -- If a test message, don't actually broadcast
     if test then
         self:OnRareTimerChannelMessage(self.channel, msg, "TestMsg")
@@ -1040,6 +1045,10 @@ end
 function RareTimer:ReceiveData(msg)
     if DEBUG then
         SendVarToRover("Received Data", msg)
+    end
+
+    if NONET then
+        return
     end
 
     if msg.Header ~= nil then
