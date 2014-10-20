@@ -53,6 +53,9 @@ local States = {
     Alive = 4, -- Up and at full health
     InCombat = 5, -- In combat (not at 100%)
     Expired = 6, -- Been longer than MaxSpawn since last known kill
+    TimerSoon = 7, -- Timer about to ding
+    TimerTick = 8, -- Timer completed a cycle
+    TimerRunning = 9, -- Timer in the middle of a cycle
 }
 
 -- Header for broadcast messages
@@ -80,6 +83,15 @@ local SpawnTypes = {
 local AlertTypes = {
     Mob = 0,
     Event = 1,
+}
+
+-- Event spawn times
+local Times = {
+    Midnight = {
+        nHour = 0,
+        nMinute = 0,
+        nSecond = 0,
+    }
 }
 
 -----------------------------------------------------------------------------------------------
@@ -180,12 +192,14 @@ local defaults = {
             ReportTimeout = 120, -- 2m, don't send basic sync broadcasts if we saw a report within this time
             SnoozeTimeout = 1800, -- 30m, snooze button suppresses alerts for this period
             UnknownTimeout = 3600, -- 1h, state changes to unknown if older, if MaxSpawn is undefined
+            EventTimeout = 600, -- 10m, if event started before this time, go to running state
             LastTargetTimeout = 120, -- 2m, If we targeted the mob within this time, don't alert
             NewerThreshold = 30, -- 0.5m, ignore reports unless they are at least this much newer
             WarnAhead = 600, -- 10m, send alert in advance by this much (for timer based alerts)
             Track = {
                 L["Aggregor the Dust Eater"],
                 L["Bugwit"],
+                L["Critical Containment"],
                 L["Defensive Protocol Unit"],
                 L["Doomthorn the Ancient"],
                 L["Grendelus the Guardian"],
@@ -226,12 +240,16 @@ local defaults = {
                 --LastReport
                 --LastTarget
                 AlertOn = true,
+                --TickStart
+                --TickInterval
+                --LastTick
+                --NextTick
             },
             {    
                 Name = L["Scorchwing"],
                 MinSpawn = 3600, --60m
                 MaxSpawn = 6600, --110m
-                SpawnTime = SpawnTypes.Window,
+                SpawnType = SpawnTypes.Window,
             },
             {
                 Name = L["Bugwit"],
@@ -301,12 +319,14 @@ local defaults = {
                 Name = L["Zoetic"],
                 AlertOn = false,
             },
-            --[[
             {
                 Name = L["Critical Containment"],
                 AlertType = AlertTypes.Event,
                 SpawnType = SpawnTypes.Timer,
+                TickStart = Times.Midnight,
+                TickInterval = 14400, -- 4h
             },
+            --[[
             {    
                 Name = L["Honeysting Barbtail"], -- Test mob
                 MinSpawn = 120, --2m
@@ -560,7 +580,7 @@ end
 
 -- Record a corpse
 function RareTimer:SawDead(entry, source)
-    if entry ~= nil and entry.State ~= States.Killed then
+    if entry ~= nil and entry.State ~= States.Killed and entry.State ~= States.Dead then
         self:SetState(entry, States.Dead, Source.Corpse)
         self:SetKilled(entry)
         self:UpdateDue(entry)
@@ -672,6 +692,15 @@ function RareTimer:GetStatusStr(entry)
     elseif entry.State == States.Expired then
         strState = L["StateExpired"]
         when = entry.Timestamp
+    elseif entry.State == States.TimerSoon then
+        strState = L["StateTimerSoon"]
+        when = entry.NextTick
+    elseif entry.State == States.TimerTick then
+        strState = L["StateTimerTick"]
+        when = entry.LastTick
+    elseif entry.State == States.TimerRunning then
+        strState = L["StateTimerRunning"]
+        when = entry.NextTick
     end
 
     if when ~= nil then
@@ -734,63 +763,134 @@ function RareTimer:PrintTable(table, depth)
     end
 end    
 
+-- Make a copy (i.e. of a table) that shares no resources with the original
+-- From http://lua-users.org/wiki/CopyTable
+function RareTimer:DeepCopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
+
+-- Make a copy of t2 but overwritten with any values present in t1
+function RareTimer:TableMerge(t2, t1)
+    local merged = self:DeepCopy(t2)
+    for key, value in pairs(t1) do
+        merged[key] = value
+    end
+    return merged
+end
+
 -- Progress state (expire entries, etc.)
 function RareTimer:UpdateState()
     for _, mob in pairs(self:GetEntries()) do
+        if mob.SpawnType == SpawnTypes.Timer then
+            self:UpdateTicks(mob)
+            if self:IsDue(mob) then
+                self:SetState(mob, States.TimerSoon, Source.Timer)
+            elseif not self:IsExpired(mob) then
+                self:SetState(mob, States.TimerTick, Source.Timer)
+            else
+                self:SetState(mob, States.TimerRunning, Source.Timer)
+            end
         -- Expire entries
-        if mob.State ~= States.Unknown and mob.State ~= States.Expired and self:IsExpired(mob) then
+        elseif mob.State ~= States.Unknown and mob.State ~= States.Expired and self:IsExpired(mob) then
             self:SetState(mob, States.Expired, Source.Timer)
-            return
         elseif mob.State == States.InCombat and self:IsCombatExpired(mob) then
             self:SetState(mob, States.Expired, Source.Timer)
-            return
         -- Set pending spawn
-        elseif mob.State ~= States.Pending and self:IsDue(mob) then
+        elseif mob.SpawnType == SpawnTypes.Window and mob.State ~= States.Pending and self:IsDue(mob) then
             self:SetState(mob, States.Pending, Source.Timer)
-            return
         end
     end
 end
 
 -- Check if an entry is due to spawn
 function RareTimer:IsDue(entry)
-    local killedAgo = self:GetAge(entry.Killed)
-    if entry.MinSpawn == nil or entry.MaxSpawn == nil or entry.MaxDue == nil or entry.killedAgo == nil then
-        return false
-    end
-
-    -- Move the due time up if we only saw the corpse, not the kill
-    local due = entry.MinSpawn
-    if entry.State == States.Dead then
-        due = due - self.db.profile.config.Slack
-    end
-
-    if (entry.State == States.Killed or entry.State == States.Dead) and killedAgo > due then
-        return true
+    -- If it's an event, check if it's about to start
+    if entry.SpawnType == SpawnTypes.Timer then
+        local now = GameLib.GetServerTime()
+        if entry.NextTick ~= nil and self:DiffTime(entry.NextTick, now) < self.db.profile.config.WarnAhead then
+            return true
+        else
+            return false
+        end
+    -- If it's a mob, check if it's about to spawn
     else
-        return false
+        -- If we can't predict a time, return false
+        local killedAgo = self:GetAge(entry.Killed)
+        if entry.MinSpawn == nil or entry.MaxSpawn == nil or entry.MaxDue == nil or entry.killedAgo == nil then
+            return false
+        end
+
+        -- Move the due time up if we only saw the corpse, not the kill
+        local due = entry.MinSpawn
+        if entry.State == States.Dead then
+            due = due - self.db.profile.config.Slack
+        end
+
+        -- Check if enough time has passed that it could spawn
+        if (entry.State == States.Killed or entry.State == States.Dead) and killedAgo > due then
+            return true
+        else
+            return false
+        end
     end
 end
 
 -- Check if an entry is expired
 function RareTimer:IsExpired(entry)
-    if entry.State == States.Pending and entry.MaxDue == nil then
-        return true
-    end
+    -- If it's an event, check if it started recently
+    if entry.SpawnType == SpawnTypes.Timer then
+        if entry.LastTick == nil or self:GetAge(entry.LastTick) > self.db.profile.config.EventTimeout then
+            return true
+        else
+            return false
+        end
+    -- If it's a mob, check if it has been too long since we heard about it
+    else
+        -- If we don't know when it's due to spawn, treat it as expired
+        if entry.State == States.Pending and entry.MaxDue == nil then
+            return true
+        end
 
-    local ago = self:GetAge(entry.Timestamp)
-    local killedAgo = self:GetAge(entry.Killed)
-    local maxAge
-    if entry.MaxSpawn ~= nil then
-        maxAge = entry.MaxSpawn + self.db.profile.config.Slack
-    else
-        maxAge = self.db.profile.config.UnknownTimeout
+        -- If we know min/max spawn times, use those, otherwise UnknownTimeout
+        local ago = self:GetAge(entry.Timestamp)
+        local killedAgo = self:GetAge(entry.Killed)
+        local maxAge
+        if entry.SpawnType == SpawnTypes.Window then
+            maxAge = entry.MaxSpawn + self.db.profile.config.Slack
+        else
+            maxAge = self.db.profile.config.UnknownTimeout
+        end
+
+        -- Check if it has timed out
+        if (ago ~= nil and ago > maxAge) or (killedAgo ~= nil and killedAgo > maxAge) then
+            return true
+        else
+            return false
+        end
     end
-    if (ago ~= nil and ago > maxAge) or (killedAgo ~= nil and killedAgo > maxAge) then
-        return true
-    else
-        return false
+end
+
+-- Update last and next event times
+function RareTimer:UpdateTicks(entry)
+    local now = GameLib.GetServerTime()
+    local tick = self:TableMerge(now, entry.TickStart) -- E.g. the preceeding midnight
+    while self:DiffTime(now, tick) > entry.TickInterval do
+        tick = self:AddDur(tick, entry.TickInterval)
     end
+    entry.LastTick = tick
+    entry.NextTick = self:AddDur(tick, entry.TickInterval)
 end
 
 -- Check if an entry is past the combat expiration time
@@ -820,6 +920,9 @@ function RareTimer:SetState(entry, state, source)
         entry.State = state
         entry.Timestamp = now
         entry.Source = source
+        if entry.SpawnType == SpawnTypes.Timer and state == States.TimerSoon then
+            self:Alert(entry)
+        end
     end
     if (state ~= States.Alive and state ~= States.InCombat) then
         self:SetHealth(entry, nil)
@@ -944,6 +1047,12 @@ function RareTimer:DurToStr(dur)
     return strOutput
 end
 
+-- Adds a duration to a timestamp, i.e. gets a timestamp dur seconds after ts
+function RareTimer:AddDur(ts, dur)
+    local t = self:ToLuaTime(ts, true) + dur
+    return self:ToWsTime(t)
+end
+
 -- Send contents of DB to other clients (if needed)
 function RareTimer:BroadcastDB(test)
     if test == nil then
@@ -966,7 +1075,7 @@ end
 -- Check if we should broadcast the entry or not
 function RareTimer:ShouldBroadcast(entry)
     local now = GameLib.GetServerTime()
-    if entry.Timestamp ~= nil and (entry.LastReport == nil or self:DiffTime(now, entry.LastReport) > self.db.profile.config.ReportTimeout) then
+    if entry.SpawnType ~= SpawnTypes.Timer and entry.Timestamp ~= nil and (entry.LastReport == nil or self:DiffTime(now, entry.LastReport) > self.db.profile.config.ReportTimeout) then
         return true
     else
         return false
@@ -1360,7 +1469,11 @@ function RareTimer:PopulateGrid(wndHandler, wndControl)
         name = entries[i].Name
         state = RT:GetStatusStr(entries[i])
         killed = "--"
-        age = RT:GetAge(entries[i].Killed)
+        if entries[i].SpawnType == SpawnTypes.Timer then
+            age = RT:GetAge(entries[i].LastTick)
+        else
+            age = RT:GetAge(entries[i].Killed)
+        end
         if age ~= nil then
             killed = RT:DurToStr(age)
         end

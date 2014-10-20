@@ -17,12 +17,15 @@ L["d"] = true -- Days
 
 -- State strings
 L["StateUnknown"] = 'Unbekannt'
-L["StateKilled"] = 'Bei %s getï¿½tet'
-L["StateDead"] = 'Bei oder vor %s Uhr getï¿½tet'
+L["StateKilled"] = 'Bei %s getötet'
+L["StateDead"] = 'Bei oder vor %s Uhr getötet'
 L["StatePending"] = 'Aufgrund vor %s laichen'
 L["StateAlive"] = 'Alive (ab %s Uhr)'
 L["StateInCombat"] = 'im Kampf (%d%%)'
 L["StateExpired"] = 'Unbekannt (zuletzt gesehen %s)'
+L["StateTimerSoon"] = 'Kurz vor dem Start (%s)'
+L["StateTimerTick"] = 'Begann um %s'
+L["StateTimerRunning"] = 'Nächste Veranstaltung %s'
 
 -- Mob names
 L["Aggregor the Dust Eater"] = "Aggregor der Staubfresser"

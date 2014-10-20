@@ -52,6 +52,9 @@ L["StatePending"] = 'Due to spawn before %s'
 L["StateAlive"] = 'Alive (as of %s)'
 L["StateInCombat"] = 'In combat'
 L["StateExpired"] = 'Unknown (last seen %s)'
+L["StateTimerSoon"] = 'About to start (%s)'
+L["StateTimerTick"] = 'Started at %s'
+L["StateTimerRunning"] = 'Next event at %s'
 
 -- Mob names
 L["Aggregor the Dust Eater"] = true

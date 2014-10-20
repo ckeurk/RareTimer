@@ -50,6 +50,9 @@ L["StatePending"] = 'Devrait reparaitre avant %s'
 L["StateAlive"] = 'En vie (%s)'
 L["StateInCombat"] = 'En combat'
 L["StateExpired"] = 'Inconnu (vu la dernière fois à %s)'
+L["StateTimerSoon"] = 'Bientôt (%s)'
+L["StateTimerTick"] = 'Commencé à %s'
+L["StateTimerRunning"] = 'Prochain à %s'
  
 -- Mob names
 L["Aggregor the Dust Eater"] = "Aggregor le Mâchepoussière"
