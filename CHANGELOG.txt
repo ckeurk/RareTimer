@@ -1,3 +1,7 @@
+0.1.19
+======
+-Bugfix for "attempt to call global 'deepcopy'"
+
 0.1.18
 ======
 -Added support for Critical Containment (AKA the R12 event)

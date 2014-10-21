@@ -20,7 +20,7 @@ local ICCommLib = ICCommLib
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 18
+local MAJOR, MINOR = "RareTimer-0.1", 19
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -771,9 +771,9 @@ function RareTimer:DeepCopy(orig)
     if orig_type == 'table' then
         copy = {}
         for orig_key, orig_value in next, orig, nil do
-            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+            copy[self:DeepCopy(orig_key)] = self:DeepCopy(orig_value)
         end
-        setmetatable(copy, deepcopy(getmetatable(orig)))
+        setmetatable(copy, self:DeepCopy(getmetatable(orig)))
     else -- number, string, boolean, etc
         copy = orig
     end
