@@ -1,3 +1,7 @@
+0.1.20
+======
+-Added Gargantua for Drop 3
+
 0.1.19
 ======
 -Bugfix for "attempt to call global 'deepcopy'"

@@ -62,6 +62,7 @@ L["Bugwit"] = true
 L["Critical Containment"] = true
 L["Defensive Protocol Unit"] = true
 L["Doomthorn the Ancient"] = true
+L["Gargantua"] = true
 L["Grendelus the Guardian"] = true
 L["Grinder"] = true
 L["Hoarding Stemdragon"] = true

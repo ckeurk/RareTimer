@@ -20,7 +20,7 @@ local ICCommLib = ICCommLib
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 19
+local MAJOR, MINOR = "RareTimer-0.1", 20
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -202,6 +202,7 @@ local defaults = {
                 L["Critical Containment"],
                 L["Defensive Protocol Unit"],
                 L["Doomthorn the Ancient"],
+                L["Gargantua"],
                 L["Grendelus the Guardian"],
                 L["Grinder"], -- Note: Shares name with npc in Thayd
                 L["Hoarding Stemdragon"],
@@ -325,6 +326,10 @@ local defaults = {
                 SpawnType = SpawnTypes.Timer,
                 TickStart = Times.Midnight,
                 TickInterval = 14400, -- 4h
+            },
+            {
+                Name = L["Gargantua"],
+                AlertOn = false,
             },
             --[[
             {    
