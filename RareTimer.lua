@@ -20,7 +20,7 @@ local ICCommLib = ICCommLib
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 20
+local MAJOR, MINOR = "RareTimer-0.1", 21
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -1164,7 +1164,7 @@ function RareTimer:ReceiveData(msg)
         return
     end
 
-    if msg.Header ~= nil then
+    if self:ValidHeader(msg) then
         if msg.Header.Required > MsgHeader.MsgVersion then
             self:OutOfDate()
             return
@@ -1172,6 +1172,11 @@ function RareTimer:ReceiveData(msg)
         if msg.Header ~= nil and msg.Header.RTVersion.Minor > MINOR then
             self:UpdateAvailable()
         end
+    else
+        if DEBUG then
+            SendVarToRover("Invalid header", msg)
+        end
+        return
     end
 
     if not self:ValidData(msg) then
@@ -1220,6 +1225,15 @@ end
 -- Verify format of msg
 function RareTimer:ValidData(msg)
     if msg.Header ~= nil and msg.Data ~= nil and msg.Data.Name ~= nil and msg.Data.Timestamp ~= nil then
+        return true
+    else
+        return false
+    end
+end
+
+-- Verify format of header
+function RareTimer:ValidHeader(msg)
+    if msg ~= nil and msg.Header ~= nil and msg.Header.MsgVersion ~= nil and msg.Header.Required ~= nil and msg.Header.RTVersion ~= nil then
         return true
     else
         return false

@@ -1,3 +1,7 @@
+0.1.21
+======
+-Bugfix for "RareTimer.lua:1168: attempt to compare number with nil"
+
 0.1.20
 ======
 -Added Gargantua for Drop 3
