@@ -1,5 +1,8 @@
 0.1.22
 ======
+-Known issue: Memory could not be read crashes. This version should reduce the
+frequency of the crashing a bit, but a real fix will require a patch
+from Carbine.
 -Bugfix for reported expired entries overwriting newer data
 -Tweaks to reduce ICCommLib usage
 
