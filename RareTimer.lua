@@ -1229,7 +1229,6 @@ function RareTimer:ReceiveData(msg)
     local alert = false
     entry.LastReport = now
     if self:IsNewer(data.Timestamp, entry.Timestamp) then
-        self:CPrint(string.format("Updated entry for %s", entry.Name))
         if entry.State ~= data.State and (data.State == States.Alive or data.State == States.InCombat or data.State == States.Killed) then
             alert = true
         end
