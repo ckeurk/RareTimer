@@ -1,3 +1,8 @@
+0.1.22
+======
+-Bugfix for reported expired entries overwriting newer data
+-Tweaks to reduce ICCommLib usage
+
 0.1.21
 ======
 -Bugfix for "RareTimer.lua:1168: attempt to compare number with nil"
