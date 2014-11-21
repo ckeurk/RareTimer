@@ -20,7 +20,7 @@ local ICCommLib = ICCommLib
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 21
+local MAJOR, MINOR = "RareTimer-0.1", 22
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -189,7 +189,7 @@ local defaults = {
             PlaySound = true,
             Slack = 600, --10m, MaxSpawn + Slack = Expired
             CombatTimeout = 300, -- 5m, leave combat state after no updates within this time
-            ReportTimeout = 120, -- 2m, don't send basic sync broadcasts if we saw a report within this time
+            ReportTimeout = 300, -- 5m, don't send basic sync broadcasts if we saw a report within this time
             SnoozeTimeout = 1800, -- 30m, snooze button suppresses alerts for this period
             UnknownTimeout = 3600, -- 1h, state changes to unknown if older, if MaxSpawn is undefined
             EventTimeout = 600, -- 10m, if event started before this time, go to running state
@@ -239,6 +239,7 @@ local defaults = {
                 --MaxDue
                 --Expires
                 --LastReport
+                --LastBroadcast
                 --LastTarget
                 AlertOn = true,
                 --TickStart
@@ -375,6 +376,10 @@ function RareTimer:OnEnable()
     Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
     Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
     Apollo.RegisterEventHandler("ToggleRareTimer", "OnToggleRareTimer", self)
+
+    if DEBUG then
+        Apollo.RegisterEventHandler("ICCommReceiveThrottled", "OnICCommReceiveThrottled", self)
+    end
 
     -- Status update channel
     self.channel = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
@@ -548,6 +553,11 @@ end
 -- Toggle the window when clicked in the interface menu
 function RareTimer:OnToggleRareTimer()
     self.wndMain:Show(not self.wndMain:IsVisible())
+end
+
+-- Report on throttled messages
+function RareTimer:OnICCommReceiveThrottled(channel, name)
+    self:CPrint(string.format("Message throttled on %s from %s", channel, name))
 end
 -----------------------------------------------------------------------------------------------
 -- RareTimer Functions
@@ -870,7 +880,6 @@ function RareTimer:IsExpired(entry)
 
         -- If we know min/max spawn times, use those, otherwise UnknownTimeout
         local ago = self:GetAge(entry.Timestamp)
-        local killedAgo = self:GetAge(entry.Killed)
         local maxAge
         if entry.SpawnType == SpawnTypes.Window then
             maxAge = entry.MaxSpawn + self.db.profile.config.Slack
@@ -879,7 +888,7 @@ function RareTimer:IsExpired(entry)
         end
 
         -- Check if it has timed out
-        if (ago ~= nil and ago > maxAge) or (killedAgo ~= nil and killedAgo > maxAge) then
+        if (ago ~= nil and ago > maxAge) then
             return true
         else
             return false
@@ -1080,11 +1089,23 @@ end
 -- Check if we should broadcast the entry or not
 function RareTimer:ShouldBroadcast(entry)
     local now = GameLib.GetServerTime()
-    if entry.SpawnType ~= SpawnTypes.Timer and entry.Timestamp ~= nil and (entry.LastReport == nil or self:DiffTime(now, entry.LastReport) > self.db.profile.config.ReportTimeout) then
-        return true
-    else
+
+    -- Don't broadcast fixed timer spawns
+    if entry.SpawnType == SpawnTypes.Timer or entry.Timestamp == nil then 
         return false
     end
+
+    -- If we have new info, send it out every ReportTimeout
+    if entry.Source ~= Source.Report and entry.State ~= States.Expired and (entry.LastBroadcast == nil or self:DiffTime(now, entry.LastBroadcast) > self.db.profile.config.ReportTimeout) then
+        return true
+    end
+
+    -- If we haven't received an update in awhile, send out whatever we have
+    if entry.LastReport == nil or self:DiffTime(now, entry.LastReport) > self.db.profile.config.ReportTimeout then
+        return true
+    end
+
+    return false
 end
 
 -- Format & broadcast an entry
@@ -1112,6 +1133,9 @@ function RareTimer:SendState(entry, msgtype, test)
     else
         self:SendData(msg)
     end
+
+    local now = GameLib.GetServerTime()
+    entry.LastBroadcast = now
 end
 
 -- Send data to other clients
@@ -1203,6 +1227,7 @@ function RareTimer:ReceiveData(msg)
     local entry = self:GetEntry(name)
     local now = GameLib.GetServerTime()
     local alert = false
+    entry.LastReport = now
     if self:IsNewer(data.Timestamp, entry.Timestamp) then
         if entry.State ~= data.State and (data.State == States.Alive or data.State == States.InCombat or data.State == States.Killed) then
             alert = true
@@ -1214,7 +1239,6 @@ function RareTimer:ReceiveData(msg)
         end
         entry.Timestamp = data.Timestamp
         entry.Source = Source.Report
-        entry.LastReport = now
     end
 
     if alert then
