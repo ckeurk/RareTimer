@@ -1,3 +1,11 @@
+0.1.23
+======
+-Updated for API 10. I don't play anymore so let me know if it actually
+works.
+-Fix for "RareTimer.lua:555: attempt to index field 'wndMain' (a nil value)"
+errors.
+
+======
 0.1.22
 ======
 -Known issue: Memory could not be read crashes. This version should reduce the

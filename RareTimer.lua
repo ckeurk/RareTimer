@@ -382,7 +382,8 @@ function RareTimer:OnEnable()
     end
 
     -- Status update channel
-    self.channel = ICCommLib.JoinChannel("RareTimerChannel", "OnRareTimerChannelMessage", self)
+    self.channel = ICCommLib.JoinChannel("RareTimerChannel", CodeEnumICCommChannelType.Global)
+    self.channel:SetReceivedMessageFunction("OnRareTimerChannelMessage", self);
 
     -- Timers
     self.timer = ApolloTimer.Create(30.0, true, "OnTimer", self) -- In seconds
@@ -552,7 +553,9 @@ end
 
 -- Toggle the window when clicked in the interface menu
 function RareTimer:OnToggleRareTimer()
-    self.wndMain:Show(not self.wndMain:IsVisible())
+    if self.wndMain ~= nil then
+        self.wndMain:Show(not self.wndMain:IsVisible())
+    end
 end
 
 -- Report on throttled messages
