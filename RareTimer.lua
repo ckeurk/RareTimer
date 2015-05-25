@@ -20,7 +20,7 @@ local ICCommLib = ICCommLib
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 22
+local MAJOR, MINOR = "RareTimer-0.1", 24
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -382,7 +382,7 @@ function RareTimer:OnEnable()
     end
 
     -- Status update channel
-    self.channel = ICCommLib.JoinChannel("RareTimerChannel", CodeEnumICCommChannelType.Global)
+    self.channel = ICCommLib.JoinChannel("RareTimerChannel", ICCommLib.CodeEnumICCommChannelType.Global)
     self.channel:SetReceivedMessageFunction("OnRareTimerChannelMessage", self);
 
     -- Timers
@@ -528,11 +528,11 @@ function RareTimer:OnTimer()
 end
 
 -- Parse announcements from other clients
-function RareTimer:OnRareTimerChannelMessage(channel, tMsg, strSender)
+function RareTimer:OnRareTimerChannelMessage(channel, tMsg, idMessage)
     if tMsg.Header ~= nil then
-        tMsg.Header.strSender = strSender
+        tMsg.Header.idMessage = idMessage
     else
-        tMsg.Header = {strSender = strSender}
+        tMsg.Header = {idMessage = idMessage}
     end
     if DEBUG then
         SendVarToRover('Received Msg', tMsg)
@@ -1223,7 +1223,7 @@ function RareTimer:ReceiveData(msg)
         return
     end
 
-    if msg.Header.strSender == "TestMsg" then
+    if msg.Header.idMessage == "TestMsg" then
         return
     end
 
