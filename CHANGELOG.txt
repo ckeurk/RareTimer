@@ -1,3 +1,7 @@
+0.1.25
+======
+-Use JSON to serialize messages for new ICCommLib api
+
 0.1.24
 ======
 -API 10 update, take 2

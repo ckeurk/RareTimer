@@ -5,6 +5,7 @@
 	<Script Name="libs/GeminiDB/GeminiDB-1.0.lua"/>
 	<Script Name="libs/GeminiGUI/GeminiGUI.lua"/>
 	<Script Name="libs/GeminiLocale/GeminiLocale.lua"/>
+	<Script Name="libs/LibJSON/LibJSON-2.5.lua"/>
 	<Script Name="libs/wildstar-pythonic-optparse/optparse.lua"/>
 
 	<Script Name="locale/enUS.lua"/>

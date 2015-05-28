@@ -16,11 +16,12 @@ local string = string
 local math = math
 local GameLib = GameLib
 local ICCommLib = ICCommLib
+local LibJSON
  
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 24
+local MAJOR, MINOR = "RareTimer-0.1", 25
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -349,6 +350,7 @@ local defaults = {
 function RareTimer:OnInitialize()
     -- Init db
     self.db = Apollo.GetPackage("Gemini:DB-1.0").tPackage:New(self, defaults, true)
+    LibJSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
 
     -- Done init
     self.IsLoading = false
@@ -1160,8 +1162,11 @@ function RareTimer:SendData(data, test)
     msg.Header.Timestamp = GameLib.GetServerTime()
     msg.Header.Locale = L["LocaleName"]
 
+    -- Serialize
+    local msgStr = LibJSON.encode(msg)
+
     if DEBUG then
-        SendVarToRover("Sent Data", msg)
+        SendVarToRover("Sent Data", msgStr)
     end
 
     if NONET then
@@ -1170,9 +1175,9 @@ function RareTimer:SendData(data, test)
 
     -- If a test message, don't actually broadcast
     if test then
-        self:OnRareTimerChannelMessage(self.channel, msg, "TestMsg")
+        self:OnRareTimerChannelMessage(self.channel, msgStr, "TestMsg")
     else
-        self.channel:SendMessage(msg)
+        self.channel:SendMessage(msgStr)
     end
 end
 
@@ -1182,14 +1187,17 @@ function RareTimer:SendTestData(msg)
 end
 
 -- Parse data from other clients
-function RareTimer:ReceiveData(msg)
+function RareTimer:ReceiveData(msgStr)
     if DEBUG then
-        SendVarToRover("Received Data", msg)
+        SendVarToRover("Received Data", msgStr)
     end
 
     if NONET then
         return
     end
+
+    -- Deserialize
+    local msg = LibJSON.decode(msgStr)
 
     if self:ValidHeader(msg) then
         if msg.Header.Required > MsgHeader.MsgVersion then
