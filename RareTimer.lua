@@ -21,7 +21,7 @@ local LibJSON
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 25
+local MAJOR, MINOR = "RareTimer-0.1", 26
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -530,16 +530,11 @@ function RareTimer:OnTimer()
 end
 
 -- Parse announcements from other clients
-function RareTimer:OnRareTimerChannelMessage(channel, tMsg, idMessage)
-    if tMsg.Header ~= nil then
-        tMsg.Header.idMessage = idMessage
-    else
-        tMsg.Header = {idMessage = idMessage}
-    end
+function RareTimer:OnRareTimerChannelMessage(channel, msgStr, idMessage)
     if DEBUG then
-        SendVarToRover('Received Msg', tMsg)
+        SendVarToRover('Received Msg', msgStr)
     end
-    self:ReceiveData(tMsg)
+    self:ReceiveData(msgStr, idMessage)
 end
 
 -- Register the window with Wildstar's window management
@@ -1187,7 +1182,7 @@ function RareTimer:SendTestData(msg)
 end
 
 -- Parse data from other clients
-function RareTimer:ReceiveData(msgStr)
+function RareTimer:ReceiveData(msgStr, idMessage)
     if DEBUG then
         SendVarToRover("Received Data", msgStr)
     end
@@ -1198,6 +1193,12 @@ function RareTimer:ReceiveData(msgStr)
 
     -- Deserialize
     local msg = LibJSON.decode(msgStr)
+
+    if msg.Header ~= nil then
+        msg.Header.idMessage = idMessage
+    else
+        msg.Header = {idMessage = idMessage}
+    end
 
     if self:ValidHeader(msg) then
         if msg.Header.Required > MsgHeader.MsgVersion then

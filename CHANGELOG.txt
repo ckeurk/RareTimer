@@ -1,3 +1,7 @@
+0.1.26
+======
+-Fix for "RareTimer.lua:537: attempt to index local 'tMsg' (a string value)"
+
 0.1.25
 ======
 -Use JSON to serialize messages for new ICCommLib api
