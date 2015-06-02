@@ -21,7 +21,7 @@ local LibJSON
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 27
+local MAJOR, MINOR = "RareTimer-0.1", 28
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
