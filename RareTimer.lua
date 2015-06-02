@@ -21,7 +21,7 @@ local LibJSON
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 26
+local MAJOR, MINOR = "RareTimer-0.1", 27
 
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
@@ -61,8 +61,8 @@ local States = {
 
 -- Header for broadcast messages
 local MsgHeader = {
-    MsgVersion = 2, -- Increment when format of broadcast data changes
-    Required = 2, -- Set to MsgVersion when format changes and breaks backwards compatibility
+    MsgVersion = 3, -- Increment when format of broadcast data changes
+    Required = 3, -- Set to MsgVersion when format changes and breaks backwards compatibility
     RTVersion = {Major = MAJOR, Minor = MINOR},
 }
  
@@ -1193,6 +1193,13 @@ function RareTimer:ReceiveData(msgStr, idMessage)
 
     -- Deserialize
     local msg = LibJSON.decode(msgStr)
+
+    if msg == nil then
+        if DEBUG then
+            SendVarToRover("Nil message from", idMessage)
+        end
+        return
+    end
 
     if msg.Header ~= nil then
         msg.Header.idMessage = idMessage
