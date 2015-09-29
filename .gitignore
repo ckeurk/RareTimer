@@ -68,3 +68,6 @@ build/
 examples/
 TODO.txt
 
+/.settings/
+/.buildpath
+/.project
