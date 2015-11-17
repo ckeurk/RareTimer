@@ -2,12 +2,12 @@
 -- Client Lua Script for RareTimer
 -- Copyright (c) NCsoft. All rights reserved
 -----------------------------------------------------------------------------------------------
- 
 require "Window"
 require "math"
 require "string"
 require "GameLib"
 require "ICCommLib"
+require "ICComm"
 
 -----------------------------------------------------------------------------------------------
 -- Local caching
@@ -21,12 +21,9 @@ local LibJSON
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local MAJOR, MINOR = "RareTimer-0.1", 28
-
+local MAJOR, MINOR = "RareTimer-2.1", 0
 local DEBUG = false -- Debug mode
 local NONET = false -- Block send/receive data
-
--- Config window
 local CONFIGWIDTH = 335
 local CONFIGHEIGHT = 740
 
@@ -35,64 +32,69 @@ kStringOk = 3
 
 -- Data sources
 local Source = {
-    Target = 0,
-    Kill = 1,
-    Create = 2,
-    Destroy = 3,
-    Combat = 4,
-    Report = 5,
-    Timer = 6,
-    Corpse = 7,
+  Target = 0,
+  Kill = 1,
+  Create = 2,
+  Destroy = 3,
+  Combat = 4,
+  Report = 5,
+  Timer = 6,
+  Corpse = 7,
 }
 
 -- Mob entry states
 local States = {
-    Unknown = 0, -- Unseen, unreported
-    Killed = 1, -- Player saw kill
-    Dead = 2, -- Player saw corpse, but not the kill
-    Pending = 3, -- Should spawn anytime now
-    Alive = 4, -- Up and at full health
-    InCombat = 5, -- In combat (not at 100%)
-    Expired = 6, -- Been longer than MaxSpawn since last known kill
-    TimerSoon = 7, -- Timer about to ding
-    TimerTick = 8, -- Timer completed a cycle
-    TimerRunning = 9, -- Timer in the middle of a cycle
+  Unknown = 0, -- Unseen, unreported
+  Killed = 1, -- Player saw kill
+  Dead = 2, -- Player saw corpse, but not the kill
+  Pending = 3, -- Should spawn anytime now
+  Alive = 4, -- Up and at full health
+  InCombat = 5, -- In combat (not at 100%)
+  Expired = 6, -- Been longer than MaxSpawn since last known kill
+  TimerSoon = 7, -- Timer about to ding
+  TimerTick = 8, -- Timer completed a cycle
+  TimerRunning = 9, -- Timer in the middle of a cycle
 }
 
 -- Header for broadcast messages
 local MsgHeader = {
-    MsgVersion = 3, -- Increment when format of broadcast data changes
-    Required = 3, -- Set to MsgVersion when format changes and breaks backwards compatibility
-    RTVersion = {Major = MAJOR, Minor = MINOR},
+  MsgVersion = 3, -- Increment when format of broadcast data changes
+  Required = 3, -- Set to MsgVersion when format changes and breaks backwards compatibility
+  RTVersion = {Major = MAJOR, Minor = MINOR},
 }
  
 -- Broadcast message types
 local MsgTypes = {
-    Update = 0,
-    Sync = 1,
-    New = 2,
+  Update = 0,
+  Sync = 1,
+  New = 2,
 }
 
 -- What we know about the spawn time
 local SpawnTypes = {
-    Other = 0,
-    Window = 1,
-    Timer = 2,
+  Other = 0,
+  Window = 1,
+  Timer = 2,
 }
 
 -- What type of thing are we tracking
 local AlertTypes = {
-    Mob = 0,
-    Event = 1,
+  Mob = 0,
+  Event = 1,
 }
 
 -- Event spawn times
 local Times = {
-    Midnight = {
-        nHour = 0,
-        nMinute = 0,
-        nSecond = 0,
-    }
+  Midnight = {
+    nHour = 0,
+    nMinute = 0,
+    nSecond = 0,
+  },
+  Offset1 = {
+    nHour = 1,
+    nMinute = 0,
+    nSecond = 0
+  }
 }
 
 -----------------------------------------------------------------------------------------------
@@ -109,9 +111,10 @@ local Optparse = Apollo.GetPackage("Optparse-0.3").tPackage
 -- Config/DB init
 -----------------------------------------------------------------------------------------------
 local confPosition = 0
+
 function nextPos()
-    confPosition = confPosition + 10
-    return confPosition
+  confPosition = confPosition + 10
+  return confPosition
 end
 
 local optionsTable = {
@@ -218,6 +221,7 @@ local defaults = {
                 L["Subject Tau"],
                 L["Subject V - Tempest"],
                 L["Zoetic"],
+                L["Star-Comm Basin"]
             }
         },
     },
@@ -333,13 +337,13 @@ local defaults = {
                 Name = L["Gargantua"],
                 AlertOn = false,
             },
-            --[[
             {    
-                Name = L["Honeysting Barbtail"], -- Test mob
-                MinSpawn = 120, --2m
-                MaxSpawn = 600, --10m
+                Name = L["Star-Comm Basin"],
+                AlertType = AlertTypes.Event,
+                SpawnType = SpawnTypes.Timer,
+                TickStart = Times.Offset1,
+                TickInterval = 7200, -- 2h
             },
-            --]]
         }
     }
 }

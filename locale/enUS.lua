@@ -77,3 +77,4 @@ L["Subject K - Brute"] = true
 L["Subject Tau"] = true
 L["Subject V - Tempest"] = true
 L["Zoetic"] = true
+L["Star-Comm Basin"] = true
